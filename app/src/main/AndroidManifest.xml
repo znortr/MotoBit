@@ -3,6 +3,10 @@
     xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Basic networking -->
+    <uses-feature
+        android:name="android.hardware.camera"
+        android:required="false" />
+
     <uses-permission android:name="android.permission.INTERNET"/>
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE"/>
     
@@ -18,6 +22,17 @@
     <!-- Android 13+ local network discovery -->
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION"/>
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION"/>
+
+    <!-- Camera permission for QR scanning -->
+    <uses-permission android:name="android.permission.CAMERA"/>
+
+    <!-- Wifi AP permissions -->
+    <uses-permission android:name="android.permission.ACCESS_WIFI_STATE" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_STATE" />
+    <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+    <uses-permission android:name="android.permission.CHANGE_WIFI_MULTICAST_STATE"/>
+    <uses-permission android:name="android.permission.CHANGE_NETWORK_STATE" />
+    <uses-permission android:name="android.permission.NEARBY_WIFI_DEVICES"/>
 
     <application
         android:allowBackup="true"

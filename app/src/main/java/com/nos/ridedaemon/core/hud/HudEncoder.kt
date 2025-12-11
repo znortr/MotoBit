@@ -1,4 +1,4 @@
-package com.nos.ridedaemon.hud
+package com.nos.ridedaemon.core.hud
 
 import android.media.MediaCodec
 import android.media.MediaCodecInfo

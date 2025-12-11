@@ -1,4 +1,4 @@
-package com.nos.ridedaemon.hud
+package com.nos.ridedaemon.core.hud
 
 import android.content.Context
 import android.net.nsd.NsdManager
@@ -7,16 +7,16 @@ import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.compose.ui.platform.LocalGraphicsContext
+import androidx.compose.animation.core.animateRectAsState
 import api.Api
 import api.MobileCallback
 import api.MobileConfig
 import api.MobileSession
 import api.StreamHost
 import com.nos.ridedaemon.R
-import kotlinx.coroutines.TimeoutCancellationException
+import org.json.JSONArray
+import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
-import kotlin.contracts.Returns
 
 class HudStreamController(
     context: Context
@@ -196,6 +196,40 @@ class HudStreamController(
         releaseMultiCastLock()
     }
 
+    private fun startEncoder(viewArea: JSONObject) {
+        val height = viewArea.optInt("height")
+        val width = viewArea.optInt("width")
+        if (height > 0 && width > 0) {
+            targetHeight = height
+            targetWidth = width
+        }
+
+        // Make sure we are streaming
+        if (!isRunning || this.mobileSession == null) return
+
+        val encoder = HudEncoder(
+            width = targetWidth,
+            height = targetHeight,
+            fps = targetFps,
+            bitrate = targetBitrate
+        ){ avccSample ->
+            try {
+                this.mobileSession?.pushFrame(avccSample)
+            } catch (e: Exception) {
+                Log.e("HudStream", "Error pushing frame", e)
+            }
+        }
+        encoder.start()
+
+        val renderer = HudRenderer(
+            surface=encoder.inputSurface,
+            fps=targetFps
+        )
+        renderer.start()
+
+        this.encoder = encoder
+    }
+
     fun start(){
         if (isDiscovering) throw IllegalStateException("controller is discovering services")
         if (isRunning) throw IllegalStateException("controller is already streaming")
@@ -215,11 +249,13 @@ class HudStreamController(
                 val callback = object : MobileCallback {
                     override fun onError(msg: String?, fatal: Boolean) {
                         val message = msg ?: "unknown HUD error"
-                        if (fatal) {
+                        if (fatal && isRunning) {
                             Log.e("HudStream", "fatal HUD stream error: $message")
                             stopInternal()
                         } else {
-                            Log.e("HudStream", "non-fatal HUD stream error: $message")
+                            if (isRunning) {
+                                Log.e("HudStream", "non-fatal HUD stream error: $message")
+                            }
                         }
                     }
 
@@ -246,37 +282,11 @@ class HudStreamController(
                     session.startSession()
                 } catch (e: Exception) {
                     Log.e("HudStream", "failed to start HUD stream session", e)
-                    return@discoverHost // exit
+                    throw e
                 }
-
-                val encoder = HudEncoder(
-                    width = targetWidth,
-                    height = targetHeight,
-                    fps = targetFps,
-                    bitrate = targetBitrate
-                ){
-                    avccSample ->
-                    try {
-                        session.pushFrame(avccSample)
-                    } catch (e: Exception) {
-                        Log.e("HudStream", "Error pushing frame", e)
-                    }
-                }
-                encoder.start()
-
-                val renderer = HudRenderer(
-                    surface=encoder.inputSurface,
-                    fps=targetFps
-                )
-                renderer.start()
 
                 this.mobileSession = session
-                this.encoder = encoder
                 isRunning = true
-
-                Log.i(
-                    "HudStream", "HUD streaming started (${targetWidth}x${targetHeight}@${targetFps})"
-                )
             }
         }
     }
@@ -318,7 +328,26 @@ class HudStreamController(
     }
 
     private fun handleHudEvent(time: Long, type: Long, payload: ByteArray?) {
-        Log.i("HudSession", "Event received: $time - ${type}: $payload")
+        when (type) {
+            3L -> payload?.let {
+                try {
+                    val text = it.toString(Charsets.UTF_8)
+                    val json: JSONObject? = JSONObject(text)
+                    json?.optJSONObject("viewAreaConfig")
+                        ?.optJSONArray("viewAreas")
+                        ?.optJSONObject(0)
+                        ?.optJSONObject("safeArea")
+                        ?.let { area ->
+                            this.startEncoder(area)
+                        }
+                } catch (e: Exception) {
+                    Log.e("HudSession", "error parsing HUD Setup response: $e")
+                }
+            }
+            else -> {
+                Log.i("HudSession", "Unknown event received: $time - ${type}: $payload")
+            }
+        }
     }
 
     private fun getStaticSignalBytes(): ByteArray {
