@@ -143,7 +143,12 @@ fun HudScreen(
     val wifiController = rememberWifiApController(
         onHudConnected = {
             scope.launch {
-                delay(6000) // gives time for Android to setup IP tables
+                val start = System.currentTimeMillis()
+                Log.d("HUD", "delay start: $start")
+
+                delay(7500)
+
+                Log.d("HUD", "delay end:  ${System.currentTimeMillis() - start} ms elapsed")
                 streamSessionStart()
             }
         },

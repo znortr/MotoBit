@@ -6,7 +6,7 @@ import android.graphics.Paint
 import android.util.Log
 import android.view.Surface
 
-class HudRenderer (
+open class HudRenderer (
     private val surface: Surface,
     private val fps: Int = 30
 ) {
@@ -29,16 +29,26 @@ class HudRenderer (
         renderThread = null
     }
 
-    private fun renderLoop() {
-        val frameDurationNs = 1_000_000_000 / fps
-        var nextFrameTime = System.nanoTime()
-        var frameCount = 0L
-
-        // Pre-allocate paint to avoid GC pressure
+    protected open fun onDrawFrame(
+        canvas: Canvas,
+        frameIndex: Long,
+        elapsedNs: Long
+    ) {
+        // default behavior = your current test renderer
         val textPaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
             color = Color.WHITE
             textSize = 48f
         }
+        canvas.drawColor(Color.DKGRAY)
+        val text = "HUD frame: $frameIndex"
+        canvas.drawText(text, 50f, 100f, textPaint)
+    }
+
+    private fun renderLoop() {
+        val frameDurationNs = 1_000_000_000 / fps
+        var nextFrameTime = System.nanoTime()
+        var frameCount = 0L
+        val startTime = nextFrameTime
 
         while (running) {
             val now = System.nanoTime()
@@ -54,15 +64,10 @@ class HudRenderer (
 
             var canvas: Canvas? = null
             try {
-                //Lock the canvas to draw
                 canvas = surface.lockCanvas(null)
 
-                // set background color to clear frame
-                canvas.drawColor(Color.DKGRAY)
-
-                val text = "HUD frame: $frameCount"
-                canvas.drawText(text, 50f, 100f, textPaint)
-
+                val elapsed = System.nanoTime() - startTime
+                onDrawFrame(canvas, frameCount, elapsed)
                 frameCount++
             } catch (t: Throwable) {
                 // this could happen with an invalid surface which

@@ -1,25 +1,24 @@
 package com.nos.ridedaemon.core.hud
 
 import android.content.Context
+import android.graphics.Color
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
-import androidx.compose.animation.core.animateRectAsState
 import api.Api
 import api.MobileCallback
 import api.MobileConfig
 import api.MobileSession
 import api.StreamHost
 import com.nos.ridedaemon.R
-import org.json.JSONArray
 import org.json.JSONObject
 import java.util.concurrent.atomic.AtomicBoolean
 
 class HudStreamController(
-    context: Context
+    private val context: Context
 ) {
     private var mobileSession: MobileSession? = null
     private var encoder: HudEncoder? = null
@@ -221,11 +220,45 @@ class HudStreamController(
         }
         encoder.start()
 
-        val renderer = HudRenderer(
+        val assets = HudAssets(context)
+        val sceneRenderer = Hud2DSceneRenderer(assets)
+
+        val renderer = Hud2DRenderer(
             surface=encoder.inputSurface,
-            fps=targetFps
+            fps=targetFps,
+            defaultWidth=800f,
+            defaultHeight=400f,
+            sceneRenderer=sceneRenderer
         )
         renderer.start()
+
+        renderer.setScene(
+            HudScene(
+                clearColor = Color.LTGRAY,
+                designWidth = 800f,
+                designHeight = 400f,
+                scaleMode = HudScaleMode.FIT,
+                elements = listOf(
+                    HudElement.Rect(
+                        z = 0,
+                        left = 0f,
+                        top = 320f,
+                        right = 800f,
+                        bottom = 400f,
+                        color = 0x66000000,
+                        cornerRadius = 16f
+                    ),
+                    HudElement.Text(
+                        z = 10,
+                        text = "Speed: 72 km/h",
+                        x = 80f,
+                        y = 370f,
+                        sizePx = 32f, // virtual "pixels", will be scaled
+                        color = Color.WHITE
+                    )
+                )
+            )
+        )
 
         this.encoder = encoder
     }
