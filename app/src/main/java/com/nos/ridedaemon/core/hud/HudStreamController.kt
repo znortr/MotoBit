@@ -23,7 +23,7 @@ class HudStreamController(
     private var mobileSession: MobileSession? = null
     private var encoder: HudEncoder? = null
 
-    private var renderer: HudRenderer? = null
+    private var renderer: Hud2DRenderer? = null
 
     private var targetWidth = 800
     private var targetHeight = 400
@@ -177,6 +177,11 @@ class HudStreamController(
         stopDiscoveryInternal()
     }
 
+    fun setRendererScene(scene: HudScene, elementsArePreSorted: Boolean = false) {
+        if (!isRunning || isDiscovering) throw IllegalStateException("controller is not in a render-able state")
+        this.renderer?.setScene(scene)
+    }
+
     private fun stopDiscoveryInternal() {
         if (!isDiscovering) return
         isDiscovering = false
@@ -205,6 +210,8 @@ class HudStreamController(
 
         // Make sure we are streaming
         if (!isRunning || this.mobileSession == null) return
+        // Make sure the past encoder has been torn down
+        if (this.encoder != null || this.renderer != null) return
 
         val encoder = HudEncoder(
             width = targetWidth,
@@ -221,7 +228,7 @@ class HudStreamController(
         encoder.start()
 
         val assets = HudAssets(context)
-        val sceneRenderer = Hud2DSceneRenderer(assets)
+        val sceneRenderer = Hud2DSceneRenderer(context, assets)
 
         val renderer = Hud2DRenderer(
             surface=encoder.inputSurface,
@@ -237,30 +244,26 @@ class HudStreamController(
                 clearColor = Color.LTGRAY,
                 designWidth = 800f,
                 designHeight = 400f,
-                scaleMode = HudScaleMode.FIT,
+                scaleMode = HudScaleMode.FILL,
                 elements = listOf(
-                    HudElement.Rect(
+                    HudElement.AnimatedImage(
                         z = 0,
+                        frameResIds = listOf(
+                            R.drawable.home_f0,
+                            R.drawable.home_f1,
+                        ),
+                        frameDurationMs = 200, // each frame = 0.2 sec (5 FPS loop)
                         left = 0f,
-                        top = 320f,
-                        right = 800f,
-                        bottom = 400f,
-                        color = 0x66000000,
-                        cornerRadius = 16f
-                    ),
-                    HudElement.Text(
-                        z = 10,
-                        text = "Speed: 72 km/h",
-                        x = 80f,
-                        y = 370f,
-                        sizePx = 32f, // virtual "pixels", will be scaled
-                        color = Color.WHITE
+                        top = 0f,
+                        width = 800f,
+                        height = 400f
                     )
                 )
             )
         )
 
         this.encoder = encoder
+        this.renderer = renderer
     }
 
     fun start(){
@@ -349,6 +352,7 @@ class HudStreamController(
             }
         }
         encoder = null
+        renderer = null
 
         mobileSession?.let { session ->
             try {

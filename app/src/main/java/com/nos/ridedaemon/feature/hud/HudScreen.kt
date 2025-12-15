@@ -4,8 +4,10 @@ import android.Manifest
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.graphics.Color
 import android.net.wifi.WifiManager
 import android.os.Build
+import android.text.format.DateFormat
 import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
@@ -38,11 +40,20 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
+import com.nos.ridedaemon.R
+import com.nos.ridedaemon.core.hud.DoubleBufferedValue
+import com.nos.ridedaemon.core.hud.HudElement
+import com.nos.ridedaemon.core.hud.HudScaleMode
+import com.nos.ridedaemon.core.hud.HudScene
 import com.nos.ridedaemon.core.hud.HudStreamController
 import com.nos.ridedaemon.core.qr.QrContent
 import com.nos.ridedaemon.feature.ap.WifiApController
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
+import java.time.LocalTime
+import java.time.format.DateTimeFormatter
+import androidx.core.graphics.toColorInt
 
 // helper to remember and clean up the controller
 @Composable
@@ -78,6 +89,46 @@ fun rememberWifiApController(
 
     return controller
 }
+
+// Element samples
+/*HudElement.Rect(
+    z = 0,
+    left = 0f,
+    top = 320f,
+    right = 800f,
+    bottom = 400f,
+    color = 0x66000000,
+    cornerRadius = 16f
+),
+HudElement.Text(
+    z = 10,
+    text = "Speed: 72 km/h",
+    x = 80f,
+    y = 370f,
+    sizePx = 32f, // virtual "pixels", will be scaled
+    color = Color.WHITE
+)*/
+/*HudElement.AnimatedImage(
+    z = 0,
+    frameResIds = listOf(
+        R.drawable.hud_bg_frame0,
+        R.drawable.hud_bg_frame1,
+        R.drawable.hud_bg_frame2
+    ),
+    frameDurationMs = 200, // each frame = 0.2 sec (5 FPS loop)
+    left = 0f,
+    top = 0f,
+    width = 800f,
+    height = 400f
+)*/
+/*HudElement.Image(
+    z = 0,
+    resId = R.drawable.hud_background_800x400,
+    left = 0,
+    top = 0,
+    width = 800,
+    height = 400
+)*/
 
 fun requiredWifiPermissions(): Array<String> {
     val list = mutableListOf<String>()
@@ -146,7 +197,7 @@ fun HudScreen(
                 val start = System.currentTimeMillis()
                 Log.d("HUD", "delay start: $start")
 
-                delay(7500)
+                delay(8000)
 
                 Log.d("HUD", "delay end:  ${System.currentTimeMillis() - start} ms elapsed")
                 streamSessionStart()
@@ -172,6 +223,17 @@ fun HudScreen(
         wifiController.startWatching()
     }
 
+    // HUD UI
+    var switched = remember { false }
+    val timeBuffer = remember { DoubleBufferedValue("--:--:--") }
+    val timeFormatter = remember {
+        if (DateFormat.is24HourFormat(ctx)) {
+            DateTimeFormatter.ofPattern("HH:mm:ss")
+        } else {
+            DateTimeFormatter.ofPattern("hh:mm:ss a")
+        }
+    }
+
     // Have we received a HUD QR value, if so connect to that wifi setup
     LaunchedEffect(hudQrValue) {
         if (hudQrValue is QrContent.HudWifi) {
@@ -195,6 +257,16 @@ fun HudScreen(
     }
 
     val isHudConnected = wifiController.isHudConnected
+
+    // Timestamp ticker
+    LaunchedEffect(isStreaming) {
+        if (!isStreaming) return@LaunchedEffect
+        while(isActive) {
+            val now = LocalTime.now()
+            timeBuffer.publish(timeFormatter.format(now))
+            delay(1_000)
+        }
+    }
 
     Scaffold(
         topBar = {
@@ -271,6 +343,59 @@ fun HudScreen(
                     enabled = isStreaming
                 ) {
                     Text("Stop")
+                }
+            }
+            Row(horizontalArrangement = Arrangement.spacedBy(16.dp)) {
+                Button(
+                    onClick = {
+                        hudStreamController.setRendererScene(
+                            HudScene(
+                                clearColor = Color.LTGRAY,
+                                designWidth = 800f,
+                                designHeight = 400f,
+                                scaleMode = HudScaleMode.FILL,
+                                elements = listOf(
+                                    HudElement.AnimatedImage(
+                                        z = 0,
+                                        frameResIds = listOf(
+                                            R.drawable.home_f0,
+                                            R.drawable.home_f1,
+                                        ),
+                                        frameDurationMs = 200, // each frame = 0.2 sec (5 FPS loop)
+                                        left = 0f,
+                                        top = 0f,
+                                        width = 800f,
+                                        height = 400f
+                                    ),
+                                    HudElement.TextDynamic(
+                                        z=1,
+                                        prefix = "",
+                                        value = timeBuffer,
+                                        x = 50f,
+                                        y = 80f,
+                                        color = "#FF7CFFB2".toColorInt() ,
+                                        sizePx = 32f,
+                                    ),
+                                    HudElement.SineWave(
+                                        z = 2,
+                                        x = 235f,
+                                        y = 370f,
+                                        width = 360f,
+                                        amplitude = 15f,
+                                        wavelength = 140f,
+                                        phaseSpeedRadPerSec = 3.0f, // animate
+                                        samples = 160,
+                                        color = 0xFF7CFFB2.toInt(),
+                                        strokeWidth = 1f
+                                    )
+                                )
+                            )
+                        )
+                        switched = true
+                    },
+                    enabled = isStreaming && !switched
+                ) {
+                    Text("Set time scene")
                 }
             }
         }
