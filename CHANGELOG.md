@@ -9,14 +9,14 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 > PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** — il resto resta identico per sempre.
 
 ```powershell
-$v = 'Motobit_alfa_V1.0.3'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.4', ...)
+$v = 'Motobit_alfa_V1.0.4'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.5', ...)
 tar -a -c -f "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" -C "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev" --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* "$v"
 ```
 
 Verifica (stessa logica, un solo punto da cambiare):
 
 ```powershell
-$v = 'Motobit_alfa_V1.0.3'
+$v = 'Motobit_alfa_V1.0.4'
 Get-Item "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}; tar -tf "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
 ```
 
@@ -43,6 +43,18 @@ MOTO_VERSION=1.0.4-alfa
 | 2.0.0-alfa | 2000 |
 
 Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non è nel formato `X.Y.Z`, Gradle si ferma con errore (voluto).
+
+---
+
+## Motobit_alfa_V1.0.4 — 2026-10-29 (in corso)
+- Cambiato: **root del progetto piatta**. Da `Motobit_alfa_V1.0.3\Motobit-Ride\Motobit-Ride\Motobit-Ride\motobit-ride-android` a `Motobit_alfa_V1.0.4\motobit-ride\motobit-ride-android` (eliminati i 3 livelli ridondanti; `motobit-ride-lib` resta sibling).
+- Cambiato: `MOTO_VERSION` → `1.0.4-alfa` (versionCode calcolato **1004**, verificato con `aapt2` sull'APK).
+- Cambiato: risoluzione mDNS senza API deprecate — `registerServiceInfoCallback` + `hostAddresses` su API 34+, `resolveService` legacy su API 29..33 (commit `5200246` sulla storia V1.0.3).
+- Noto: l'APK archiviato come `_versions\Motobit_alfa_V1.0.3.apk` **non** contiene il fix mDNS (build precedente al fix): il fix debutta in 1.0.4.
+- Noto: le firme reali nell'SDK 36 sono `onServiceUpdated(NsdServiceInfo)` + `onServiceLost()` e `hostAddresses` è una `List<InetAddress>` (non `onServiceInfoUpdated`, non array) — verificate con `javap` su `android-34/35/36`.
+
+Backup: NO (non richiesto per questa versione)
+APK: build `assembleDebug` OK (BUILD SUCCESSFUL, 101,9 MB) · non ancora archiviato in `_versions\Motobit_alfa_V1.0.4.apk` · testato: no
 
 ---
 
