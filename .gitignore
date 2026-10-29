@@ -18,3 +18,7 @@ local.properties
 app/libs/*
 local.properties
 .kotlin
+
+# backup locali (non devono stare nei sorgenti)
+*.bak
+*.orig
