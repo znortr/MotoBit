@@ -55,14 +55,15 @@ Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non �
 - Aggiunto: HUD memorizzato (`SavedHud`) — QR una volta sola, credenziali persistite, nome mostrato.
 - Aggiunto: impostazioni — comportamento avvio (3 opzioni, default "solo credenziali"), sospensione encoder, esclusione Doze, HUD salvato.
 - Aggiunto: pannello log in-app (Copia / Salva .txt / Pulisci).
-- Aggiunto: `CHANGELOG.md`.
+- Aggiunto: `CHANGELOG.md` con comando `tar` per lo zip di backup (variabile `$v`) e sezione "cambiare versione".
+- Aggiunto: cartella `_versions\` (gitignored) con l'APK archiviato per versione.
 - Cambiato: `applicationId`/namespace `com.nos.ridedaemon` → `com.nos.motobitride`.
-- Cambiato: `versionCode` 1 → 1003, `versionName` "1.0" → "1.0.3-alfa".
+- Cambiato: versione da sorgente unica `MOTO_VERSION` in `gradle.properties`; `versionName` = `MOTO_VERSION`, `versionCode` calcolato (`X*1000+Y*100+Z`). Valori attuali: `1.0.3-alfa` / `1003`.
 - Cambiato: baseline git creata (commit `0d4d523`, tag annotato `Motobit_alfa_V1.0.3`), `app/libs/hudlib.aar` tracciato con `git add -f`.
 - Risolto: `core/hud/HudStreamController.kt.bak` spostato in `docs/legacy/` (git mv, storia preservata); `.gitignore` ora ignora `*.bak` e `*.orig`.
 - Noto: remoto git "grafted" (storia shallow): non fare push senza valutazione del remoto.
 - Noto: TFT adatta il video preservando il rapporto; per riempirlo serve rapporto 0,787 (target 1080x1372). Schermo virtuale scartato. Risoluzione via Shizuku/bolla: non presente in questa versione (esiste solo nella copia `test\`).
 
 Backup: SI → `dev_backup\Motobit_alfa_V1.0.3.zip` (182,5 MB, creato 2026-10-29 con `tar`; esclusi `build`, `.gradle`, `.kotlin`, `.idea`; 278 file / 212,6 MB non compressi; include `motobit-ride-lib`, `hudlib.aar`, `.git` e `local.properties`)
-APK: nessuno · non compilato in questa sessione · testato: no
+APK: `_versions\Motobit_alfa_V1.0.3.apk` · 101,9 MB · build `assembleDebug` 2026-10-29 (BUILD SUCCESSFUL 28s, 34 task) · `aapt2` conferma versionCode 1003 / versionName 1.0.3-alfa · testato: no
 Ripristino: `git checkout Motobit_alfa_V1.0.3 -- .` a IDE aperto (oppure `git reset --hard 0d4d523`)

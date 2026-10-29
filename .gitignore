@@ -22,3 +22,6 @@ local.properties
 # backup locali (non devono stare nei sorgenti)
 *.bak
 *.orig
+
+# APK archiviati per versione (non vanno in git)
+_versions/
