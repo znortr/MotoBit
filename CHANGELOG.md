@@ -17,11 +17,10 @@ Formato: voci dalla più recente alla più vecchia. Regola backup: a ogni APK ge
 - Cambiato: `applicationId`/namespace `com.nos.ridedaemon` → `com.nos.motobitride`.
 - Cambiato: `versionCode` 1 → 1003, `versionName` "1.0" → "1.0.3-alfa".
 - Cambiato: baseline git creata (commit `0d4d523`, tag annotato `Motobit_alfa_V1.0.3`), `app/libs/hudlib.aar` tracciato con `git add -f`.
-- Noto: `core/hud/HudStreamController.kt.bak` è un file di backup rimasto dentro i sorgenti (non compila, innocuo) — da spostare/rimuovere.
+- Risolto: `core/hud/HudStreamController.kt.bak` spostato in `docs/legacy/` (git mv, storia preservata); `.gitignore` ora ignora `*.bak` e `*.orig`.
 - Noto: remoto git "grafted" (storia shallow): non fare push senza valutazione del remoto.
-- Noto: `dev_backup\` è vuota — nessuno zip di backup per questa versione.
 - Noto: TFT adatta il video preservando il rapporto; per riempirlo serve rapporto 0,787 (target 1080x1372). Schermo virtuale scartato. Risoluzione via Shizuku/bolla: non presente in questa versione (esiste solo nella copia `test\`).
 
-Backup: NO → `dev_backup\Motobit_alfa_V1.0.3.zip` assente (esiste solo l'archivio `motobitdev\Motobit_alfa_V1.0.3.rar`)
+Backup: SI → `dev_backup\Motobit_alfa_V1.0.3.zip` (182,5 MB, creato 2026-10-29 con `tar`; esclusi `build`, `.gradle`, `.kotlin`, `.idea`; 278 file / 212,6 MB non compressi; include `motobit-ride-lib`, `hudlib.aar`, `.git` e `local.properties`)
 APK: nessuno · non compilato in questa sessione · testato: no
 Ripristino: `git checkout Motobit_alfa_V1.0.3 -- .` a IDE aperto (oppure `git reset --hard 0d4d523`)
