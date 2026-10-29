@@ -1,6 +1,26 @@
 # CHANGELOG — Motobit-Ride (Android)
 
-Formato: voci dalla più recente alla più vecchia. Regola backup: a ogni APK generato va confermato il backup zip in `motobitdev\dev_backup\`.
+Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a ogni versione, solo quando serve (lo zip va in `motobitdev\dev_backup\`).
+
+---
+
+## 📋 INCOLLA NEL TERMINALE PER CREARE LO ZIP DI BACKUP
+
+> PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** — il resto resta identico per sempre.
+
+```powershell
+$v = 'Motobit_alfa_V1.0.3'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.4', ...)
+tar -a -c -f "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" -C "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev" --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* "$v"
+```
+
+Verifica (stessa logica, un solo punto da cambiare):
+
+```powershell
+$v = 'Motobit_alfa_V1.0.3'
+Get-Item "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}; tar -tf "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
+```
+
+Atteso: `0` voci `*/build/*` e `*/.gradle/*` dentro lo zip; `settings.gradle.kts`, `hudlib.aar`, `local.properties`, `.git/HEAD` tutti presenti.
 
 ---
 
