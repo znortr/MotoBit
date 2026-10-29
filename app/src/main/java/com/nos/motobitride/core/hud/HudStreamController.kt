@@ -9,6 +9,7 @@ import android.media.projection.MediaProjection
 import android.net.nsd.NsdManager
 import android.net.nsd.NsdServiceInfo
 import android.net.wifi.WifiManager
+import android.os.Build
 import android.os.Handler
 import android.os.HandlerThread
 import android.os.Looper
@@ -22,6 +23,8 @@ import com.nos.motobitride.core.log.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
+import java.net.Inet4Address
+import java.util.concurrent.Executor
 import java.util.concurrent.atomic.AtomicBoolean
 
 enum class StreamState {
@@ -87,6 +90,15 @@ class HudStreamController(
 
     private var multicastLock: WifiManager.MulticastLock? = null
     private var discoveryListener: NsdManager.DiscoveryListener? = null
+
+    /**
+     * Chiusura del callback mDNS "moderno" (API 34+): null quando non c'e' una
+     * risoluzione in sospeso, sempre null su API 29..33.
+     * Tipo volutamente `() -> Unit` invece di `NsdManager.ServiceInfoCallback`,
+     * cosi' nessuna classe introdotta in API 34 compare nella firma di un campo.
+     */
+    @Volatile
+    private var unregisterServiceInfoCallback: (() -> Unit)? = null
 
     private val serviceType = "_EasyConn._tcp."
     private val expectedPackageName = "com.cfmoto.cfmotointernational"
@@ -191,28 +203,23 @@ class HudStreamController(
 
                 AppLog.i(TAG, "mDNS: servizio trovato ${serviceInfo.serviceName}")
 
-                nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
-                    override fun onResolveFailed(serviceInfo: NsdServiceInfo?, errorCode: Int) {
-                        AppLog.w(TAG, "mDNS: resolve fallita (errore $errorCode)")
-                    }
-
-                    override fun onServiceResolved(resolved: NsdServiceInfo) {
-                        if (!isDiscovering || completed.get()) return
+                resolveServiceInfo(
+                    serviceInfo = serviceInfo,
+                    onResolved = { hostAddress, port, attrs ->
+                        if (!isDiscovering || completed.get()) return@resolveServiceInfo
 
                         try {
-                            val attrs: Map<String, ByteArray> = resolved.attributes
                             val pkgAttr = attrs["packagename"]?.toString(Charsets.UTF_8)
                             val ipAttr = attrs["ip"]?.toString(Charsets.UTF_8)
 
-                            val port = resolved.port
-                            val ip = ipAttr ?: resolved.host.hostAddress
+                            val ip = ipAttr ?: hostAddress
                             val packageName = pkgAttr ?: expectedPackageName
 
                             val matchesPackage =
                                 expectedPackageName.isEmpty() || packageName == expectedPackageName
 
                             if (matchesPackage && ip != null) {
-                                if (!completed.compareAndSet(false, true)) return
+                                if (!completed.compareAndSet(false, true)) return@resolveServiceInfo
                                 stopDiscoveryInternal()
 
                                 AppLog.i(TAG, "mDNS: host risolto $ip:$port (pkg=$packageName)")
@@ -224,8 +231,11 @@ class HudStreamController(
                         } catch (t: Throwable) {
                             AppLog.e(TAG, "mDNS: errore resolve", t)
                         }
+                    },
+                    onFailed = { errorCode ->
+                        AppLog.w(TAG, "mDNS: resolve fallita (errore $errorCode)")
                     }
-                })
+                )
             }
 
             override fun onServiceLost(serviceInfo: NsdServiceInfo?) {
@@ -265,6 +275,94 @@ class HudStreamController(
         }, timeoutMs)
     }
 
+    /**
+     * Risolve IP / porta / attributi TXT di un servizio mDNS trovato.
+     *
+     * Due strade con lo stesso contratto (una sola callback: `onResolved` oppure
+     * `onFailed`):
+     *  - API 34+ : `registerServiceInfoCallback` + `hostAddresses`, perche'
+     *              `resolveService` e `NsdServiceInfo.host` sono deprecate da Android 14.
+     *  - API 29..33: `resolveService` legacy (unica disponibile), con @Suppress mirato.
+     *
+     * L'IP restituito e' quello IPv4 quando presente, come faceva il vecchio
+     * `resolved.host`, per non cambiare la destinazione della connessione.
+     */
+    @Suppress("DEPRECATION")
+    private fun resolveServiceInfo(
+        serviceInfo: NsdServiceInfo,
+        onResolved: (hostAddress: String?, port: Int, attributes: Map<String, ByteArray>) -> Unit,
+        onFailed: (errorCode: Int) -> Unit
+    ) {
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+            val settled = AtomicBoolean(false)
+            lateinit var callback: NsdManager.ServiceInfoCallback
+            val unregister = {
+                unregisterServiceInfoCallback = null
+                try {
+                    nsdManager.unregisterServiceInfoCallback(callback)
+                } catch (e: Exception) {
+                    AppLog.w(TAG, "mDNS: unregisterServiceInfoCallback: ${e.message}")
+                }
+            }
+            callback = object : NsdManager.ServiceInfoCallback {
+                override fun onServiceInfoCallbackRegistrationFailed(errorCode: Int) {
+                    if (!settled.compareAndSet(false, true)) return
+                    unregisterServiceInfoCallback = null
+                    onFailed(errorCode)
+                }
+
+                override fun onServiceUpdated(info: NsdServiceInfo) {
+                    if (!settled.compareAndSet(false, true)) return
+                    unregister()
+                    // hostAddresses e' una List<InetAddress> (API 34+): preferiamo IPv4
+                    // come faceva il vecchio `host`, per non cambiare la destinazione.
+                    val addresses = info.hostAddresses
+                    val preferred = addresses.firstOrNull { it is Inet4Address }
+                        ?: addresses.firstOrNull()
+                    onResolved(preferred?.hostAddress, info.port, info.attributes)
+                }
+
+                override fun onServiceLost() {
+                    // Servizio sparito prima di essere risolto: nessun codice NsdManager
+                    // corrispondente, usiamo -2 (stesso trattamento degli altri errori).
+                    if (!settled.compareAndSet(false, true)) return
+                    unregisterServiceInfoCallback = null
+                    onFailed(-2)
+                }
+
+                override fun onServiceInfoCallbackUnregistered() {
+                    // chiusura confermata dal sistema: nessuna azione necessaria
+                }
+            }
+            unregisterServiceInfoCallback = unregister
+            try {
+                nsdManager.registerServiceInfoCallback(
+                    serviceInfo,
+                    Executor { command -> mainHandler.post(command) },
+                    callback
+                )
+            } catch (e: Exception) {
+                if (settled.compareAndSet(false, true)) {
+                    unregisterServiceInfoCallback = null
+                    AppLog.e(TAG, "mDNS: registerServiceInfoCallback ha lanciato", e)
+                    onFailed(-1)
+                }
+            }
+            return
+        }
+
+        // API 29..33: unica API disponibile (deprecata solo a partire da API 34).
+        nsdManager.resolveService(serviceInfo, object : NsdManager.ResolveListener {
+            override fun onResolveFailed(info: NsdServiceInfo?, errorCode: Int) {
+                onFailed(errorCode)
+            }
+
+            override fun onServiceResolved(resolved: NsdServiceInfo) {
+                onResolved(resolved.host?.hostAddress, resolved.port, resolved.attributes)
+            }
+        })
+    }
+
     fun stopDiscovery() = stopDiscoveryInternal()
 
     private fun stopDiscoveryInternal() {
@@ -281,6 +379,8 @@ class HudStreamController(
             }
         }
         discoveryListener = null
+        unregisterServiceInfoCallback?.let { it() }
+        unregisterServiceInfoCallback = null
         releaseMultiCastLock()
     }
 
