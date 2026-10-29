@@ -24,6 +24,28 @@ Atteso: `0` voci `*/build/*` e `*/.gradle/*` dentro lo zip; `settings.gradle.kts
 
 ---
 
+## 🔢 CAMBIARE VERSIONE (1 riga sola)
+
+Sorgente unica di verità: **`MOTO_VERSION` in `gradle.properties`**. Non toccare più `versionCode` / `versionName` in `app/build.gradle.kts` (sono calcolati).
+
+```properties
+# gradle.properties
+MOTO_VERSION=1.0.4-alfa
+```
+
+`versionCode` si calcola da sé: `X.Y.Z` → `X*1000 + Y*100 + Z`
+
+| `MOTO_VERSION` | `versionCode` |
+|---|---|
+| 1.0.3-alfa | 1003 |
+| 1.0.4-alfa | 1004 |
+| 1.1.0-alfa | 1100 |
+| 2.0.0-alfa | 2000 |
+
+Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non è nel formato `X.Y.Z`, Gradle si ferma con errore (voluto).
+
+---
+
 ## Motobit_alfa_V1.0.3 — 2026-10-29
 - Aggiunto: link Wi-Fi Direct (P2P) verso l'HU — MAC dal QR come `deviceAddress`, IP da `groupOwnerAddress`, mDNS saltato se l'IP è noto, retry illimitato con backoff 3→10 s (TAG log `WifiP2pLink`).
 - Aggiunto: mirroring reale MediaProjection → VirtualDisplay → ImageReader → YUV420 → MediaCodec ByteBuffer con pace thread 30 fps (input Surface limitato a ~1 fps a schermo fermo). Baseline, level 3.1, `keyint=1`, CBR 3 Mbps, SPS/PPS sui keyframe.

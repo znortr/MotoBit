@@ -13,8 +13,11 @@ android {
         applicationId = "com.nos.motobitride"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1003
-        versionName = "1.0.3-alfa"
+        // Versione: UNICA sorgente di verita' e' MOTO_VERSION in gradle.properties.
+        val motoVer = providers.gradleProperty("MOTO_VERSION").get()
+        val (vMaj, vMin, vPat) = Regex("""(\d+)\.(\d+)\.(\d+)""").find(motoVer)!!.destructured
+        versionName = motoVer
+        versionCode = vMaj.toInt() * 1000 + vMin.toInt() * 100 + vPat.toInt()
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
