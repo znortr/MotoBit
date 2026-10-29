@@ -53,7 +53,7 @@ unused stub screen there). See [Known rough edges](#known-rough-edges) below.
 ## Setup
 
 1. Build the Go library's Android bindings (see the
-   [ridedaemon-lib](../ridedaemon-lib) README) and drop the resulting AAR at:
+   [motobit-ride-lib](../motobit-ride-lib) README) and drop the resulting AAR at:
    ```
    app/libs/hudlib.aar
    ```

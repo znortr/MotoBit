@@ -19,5 +19,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "RideDaemon"
+rootProject.name = "motobit-ride"
 include(":app")

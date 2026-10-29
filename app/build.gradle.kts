@@ -6,15 +6,15 @@ plugins {
 }
 
 android {
-    namespace = "com.nos.ridedaemon"
+    namespace = "com.nos.motobitride"
     compileSdk = 36
 
     defaultConfig {
-        applicationId = "com.nos.ridedaemon"
+        applicationId = "com.nos.motobitride"
         minSdk = 29
         targetSdk = 36
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 1003
+        versionName = "1.0.3-alfa"
 
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
     }
