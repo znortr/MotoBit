@@ -9,15 +9,21 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 > PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** — il resto resta identico per sempre.
 
 ```powershell
-$v = 'Motobit_alfa_V1.0.4'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.5', ...)
-tar -a -c -f "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" -C "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev" --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* "$v"
+$v   = 'Motobit_alfa_V1.0.4'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.5', ...)
+$dev = 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev'
+$zip = Join-Path $dev "dev_backup\$v.zip"
+tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* $v
 ```
+
+> Se dopo il paste il prompt scende su `>>`, la shell sta aspettando una quote chiusa: `Ctrl+C` (una o due volte), poi rilanciare. Incollare riga per riga, un solo Invio.
 
 Verifica (stessa logica, un solo punto da cambiare):
 
 ```powershell
-$v = 'Motobit_alfa_V1.0.4'
-Get-Item "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}; tar -tf "H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup\$v.zip" | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
+$v   = 'Motobit_alfa_V1.0.4'
+$zip = Join-Path 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup' "$v.zip"
+Get-Item $zip | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}
+tar -tf $zip | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
 ```
 
 Atteso: `0` voci `*/build/*` e `*/.gradle/*` dentro lo zip; `settings.gradle.kts`, `hudlib.aar`, `local.properties`, `.git/HEAD` tutti presenti.
@@ -53,8 +59,8 @@ Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non �
 - Noto: l'APK archiviato come `_versions\Motobit_alfa_V1.0.3.apk` **non** contiene il fix mDNS (build precedente al fix): il fix debutta in 1.0.4.
 - Noto: le firme reali nell'SDK 36 sono `onServiceUpdated(NsdServiceInfo)` + `onServiceLost()` e `hostAddresses` è una `List<InetAddress>` (non `onServiceInfoUpdated`, non array) — verificate con `javap` su `android-34/35/36`.
 
-Backup: NO (non richiesto per questa versione)
-APK: build `assembleDebug` OK (BUILD SUCCESSFUL, 101,9 MB) · non ancora archiviato in `_versions\Motobit_alfa_V1.0.4.apk` · testato: no
+Backup: SI → `dev_backup\Motobit_alfa_V1.0.4.zip` (221,6 MB, creato 2026-10-29 15:07 con `tar`; esclusi `build`, `.gradle`, `.kotlin`, `.idea`; 522 file; include `motobit-ride-lib`, `hudlib.aar`, `.git`, `local.properties` e `_versions\Motobit_alfa_V1.0.3.apk`)
+APK: `_versions\Motobit_alfa_V1.0.4.apk` · 101,9 MB · build `assembleDebug` 2026-10-29 14:47 (BUILD SUCCESSFUL, 0 warning) · `aapt2` conferma versionCode 1004 / versionName 1.0.4-alfa · testato: no
 
 ---
 
