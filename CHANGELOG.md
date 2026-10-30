@@ -9,7 +9,7 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 > PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** — il resto resta identico per sempre.
 
 ```powershell
-$v   = 'Motobit_alfa_V1.0.4'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.5', ...)
+$v   = 'Motobit_alfa_V1.0.5'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.5', ...)
 $dev = 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev'
 $zip = Join-Path $dev "dev_backup\$v.zip"
 tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* $v
@@ -20,7 +20,7 @@ tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gra
 Verifica (stessa logica, un solo punto da cambiare):
 
 ```powershell
-$v   = 'Motobit_alfa_V1.0.4'
+$v   = 'Motobit_alfa_V1.0.5'
 $zip = Join-Path 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup' "$v.zip"
 Get-Item $zip | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 tar -tf $zip | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
@@ -36,7 +36,7 @@ Sorgente unica di verità: **`MOTO_VERSION` in `gradle.properties`**. Non toccar
 
 ```properties
 # gradle.properties
-MOTO_VERSION=1.0.4-alfa
+MOTO_VERSION=1.0.5-alfa
 ```
 
 `versionCode` si calcola da sé: `X.Y.Z` → `X*1000 + Y*100 + Z`
@@ -45,6 +45,7 @@ MOTO_VERSION=1.0.4-alfa
 |---|---|
 | 1.0.3-alfa | 1003 |
 | 1.0.4-alfa | 1004 |
+| 1.0.5-alfa | 1005 |
 | 1.1.0-alfa | 1100 |
 | 2.0.0-alfa | 2000 |
 
@@ -52,7 +53,27 @@ Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non �
 
 ---
 
-## Motobit_alfa_V1.0.4 — 2026-10-29 (in corso)
+## Motobit_alfa_V1.0.5 — 2026-10-30
+- Cambiato: `MOTO_VERSION` → `1.0.5-alfa` (versionCode calcolato **1005**, verificato con `aapt2` sull'APK).
+- Corretto: il retry P2P armato durante la negoziazione **smontava il gruppo appena formato** (~6 s dopo `LINK P2P ATTIVO`). Ora `markConnected()` annulla ogni retry pendente.
+- Corretto: `groupFormed=false` senza link attivo è solo un transiente: non arma più un retry (prima generava `Retry P2P #n`).
+- Corretto: un secondo Avvia (o `connect`) con le stesse credenziali non rifà più il teardown del tentativo in corso: log `connect(...) ignorato: tentativo in corso`.
+- Corretto: lookup del peer guidato dagli eventi `PEERS_CHANGED` + polling 1 s (prima attesa fissa di 6 s) e runnable annullato al teardown (nessun doppio connect).
+- Corretto: MAC o config P2P non validi non azzerano più il retry automatico (prima `autoRetryEnabled = false` lasciava il link morto per sempre).
+- Corretto: anche la sessione Go **in fase di `startSession()`** viene chiusa con le altre (fine di `listen tcp :10922: bind: address already in use`).
+- Corretto: **Stop = pausa** — sessione e cattura restano attive, l'encoder va in pausa; Avvia riprende senza handshake e senza nuovo consenso (prima l'HU rifiutava la nuova sessione per ~45 s). La chiusura completa resta sul pulsante **Chiudi** (nuovo metodo `close()`).
+- Aggiunto: probe TCP su `192.168.13.1:10930` prima di ogni handshake (log `HUD pronto su … dopo X ms`): evita tentativi da 10 s a vuoto.
+- Aggiunto: pulsante **Chiudi** — chiude sessione, rilascia il link, ferma il servizio e termina l'app.
+- Noto: dal `LINK P2P ATTIVO` alla prima sessione pronta servono **~17 s costanti** (10:18:36→10:18:53, 10:20:19→10:20:36): è un tempo dell'HU, ora misurato dal probe.
+- Noto: Android revoca la `MediaProjection` quando l'HU chiude la sessione (`MediaProjection revocata dal sistema/utente`) → serve un nuovo consenso. Da ridurre nella 1.0.6.
+- Verificato con i log 10:18-10:25: Stop→Avvia ripreso in **7 ms** (`Sessione ancora viva: ripresa immediata senza handshake`); link P2P agganciato in 1,5-2,5 s e stabile (nessun `Link P2P perso` dopo 6 s).
+
+Backup: SI → `dev_backup\Motobit_alfa_V1.0.5.zip` (299,7 MB, creato 2026-10-30 10:58 con `tar`; esclusi `build`, `.gradle`, `.kotlin`, `.idea`; 561 voci; include `motobit-ride-lib`, `hudlib.aar`, `.git`, `local.properties` e tutti gli APK in `_versions`)
+APK: `_versions\Motobit_alfa_V1.0.5.apk` · 101,9 MB · build `assembleDebug` 2026-10-30 10:55 (BUILD SUCCESSFUL, 0 warning) · `aapt2` conferma versionCode 1005 / versionName 1.0.5-alfa · testato: SI
+
+---
+
+## Motobit_alfa_V1.0.4 — 2026-10-29
 - Cambiato: **root del progetto piatta**. Da `Motobit_alfa_V1.0.3\Motobit-Ride\Motobit-Ride\Motobit-Ride\motobit-ride-android` a `Motobit_alfa_V1.0.4\motobit-ride\motobit-ride-android` (eliminati i 3 livelli ridondanti; `motobit-ride-lib` resta sibling).
 - Cambiato: `MOTO_VERSION` → `1.0.4-alfa` (versionCode calcolato **1004**, verificato con `aapt2` sull'APK).
 - Cambiato: risoluzione mDNS senza API deprecate — `registerServiceInfoCallback` + `hostAddresses` su API 34+, `resolveService` legacy su API 29..33 (commit `5200246` sulla storia V1.0.3).

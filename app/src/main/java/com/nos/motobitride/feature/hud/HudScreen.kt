@@ -400,8 +400,9 @@ fun HudScreen(
                     onClick = {
                         AppLog.i(TAG_UI, "Stop premuto")
                         streamRequested = false
+                        // Stop = PAUSA: la cattura resta attiva, cosi' Avvia riparte subito.
+                        // (Il servizio non va fermato: ucciderebbe la MediaProjection.)
                         hudStreamController.stop()
-                        ScreenCaptureService.stopService(ctx)
                     },
                     enabled = isActive
                 ) {
@@ -411,12 +412,18 @@ fun HudScreen(
 
             OutlinedButton(
                 onClick = {
-                    AppLog.i(TAG_UI, "Sgancio link Wi-Fi Direct")
+                    // Chiudi: ferma lo stream, rilascia il link e termina l'app.
+                    // Usa solo API gia' presenti (stop/disconnect/stopService):
+                    // nessuna modifica alla logica di connessione.
+                    AppLog.i(TAG_UI, "Chiudi premuto")
+                    streamRequested = false
+                    hudStreamController.close()
                     wifiController.disconnect()
-                },
-                enabled = !isActive
+                    ScreenCaptureService.stopService(ctx)
+                    ctx.getActivity()?.finishAndRemoveTask()
+                }
             ) {
-                Text("Sgancia link")
+                Text("Chiudi")
             }
 
             LogPanel(

@@ -55,6 +55,14 @@ class HudStreamController(
     private val context: Context
 ) {
     private var mobileSession: MobileSession? = null
+
+    /**
+     * Sessione in fase di `startSession()` (chiamata bloccante). Finche' non torna
+     * puo' tenere occupate le porte 10920/10921/10922: senza chiuderla qui, un
+     * Avvia subito dopo uno Stop trovava `listen tcp :10922: bind: address already
+     * in use` (visto in log).
+     */
+    private var pendingSession: MobileSession? = null
     private var encoder: HudEncoder? = null
 
     @Volatile
@@ -129,6 +137,14 @@ class HudStreamController(
     // breve resta "calda" (resume istantaneo), una lunga non consuma batteria.
     @Volatile
     private var encoderPaused = false
+
+    /**
+     * Stop dell'utente = PAUSA: la sessione Go resta VIVA, si smette solo di
+     * inviare frame. Chiuderla faceva rifiutare all'HU il nuovo handshake per
+     * ~45 s (visto in log: stop 09:54:20 -> ripresa solo 09:55:11).
+     */
+    @Volatile
+    private var streamPaused = false
     @Volatile
     private var encoderIdleTimeoutMs = DEFAULT_ENCODER_IDLE_TIMEOUT_MS
     private var encoderIdleTimerPending = false
@@ -399,10 +415,30 @@ class HudStreamController(
         }
 
         stopRequested = false
+        streamPaused = false
         mirrorAttempts = 0
         reconnectAttempt = 0
         reconnectDelayMs = RECONNECT_MIN_DELAY_MS
         reconnectPending = false
+
+        // Stop era una pausa: se la sessione e' ancora viva si riprende SUBITO,
+        // senza handshake (l'HU non ha nulla da negoziare).
+        val alive = mobileSession?.let { runCatching { it.isRunning() }.getOrDefault(false) }
+        if (alive == true) {
+            AppLog.i(TAG, "Sessione ancora viva: ripresa immediata senza handshake")
+            isRunning = true
+            resumeEncoderIfPaused()
+            if (mediaProjection != null && attachMirroring()) {
+                _state.value = StreamState.MIRRORING
+                _status.value = "Mirroring ${videoWidth}x${videoHeight}"
+                encoder?.requestSyncFrame()
+            } else {
+                _state.value = StreamState.AWAITING_PROJECTION
+            }
+            startWatchdog()
+            return
+        }
+
         _status.value = "Ricerca HUD..."
         beginDiscovery()
     }
@@ -420,8 +456,27 @@ class HudStreamController(
     }
 
     fun stop() {
-        AppLog.i(TAG, "stop() richiesto")
+        AppLog.i(TAG, "stop() richiesto (pausa: sessione e cattura restano attive)")
+        streamPaused = true
+        stopWatchdog()
+        cancelEncoderIdleTimer()
+        isRunning = false
+
+        // Si smette di inviare frame, ma la sessione Go resta aperta.
+        if (!encoderPaused) {
+            encoderPaused = true
+            encoder?.pause()
+        }
+
+        _state.value = StreamState.IDLE
+        _status.value = "In pausa"
+    }
+
+    /** Chiusura completa: sessione + mirroring + projection. Usata da "Chiudi". */
+    fun close() {
+        AppLog.i(TAG, "close() richiesto (chiusura completa)")
         stopRequested = true
+        streamPaused = false
         stopWatchdog()
         cancelEncoderIdleTimer()
         encoderPaused = false
@@ -487,6 +542,13 @@ class HudStreamController(
             _status.value = "Connessione a $knownIp (dal link Wi-Fi)"
             AppLog.i(TAG, "Uso host dal link: $knownIp:$preferredHostPort")
             Thread {
+                // PROBE: l'HU accetta l'handshake solo quando il suo server e'
+                // pronto. Una connect TCP da 700 ms lo dice subito; il dial cieco
+                // della libreria costa 5-10 s a tentativo (visto in log).
+                if (!waitForHudPort(knownIp, preferredHostPort)) {
+                    scheduleReconnect("porta $knownIp:$preferredHostPort chiusa")
+                    return@Thread
+                }
                 try {
                     val host = Api.newStreamHost(
                         knownIp,
@@ -521,6 +583,35 @@ class HudStreamController(
             AppLog.e(TAG, "discoverHost ha lanciato", t)
             scheduleReconnect("errore discovery: ${t.message}")
         }
+    }
+
+    /** La porta dell'HU risponde? Costo massimo [PROBE_TIMEOUT_MS]. */
+    private fun isHudPortOpen(host: String, port: Int): Boolean = try {
+        java.net.Socket().use { socket ->
+            socket.connect(java.net.InetSocketAddress(host, port), PROBE_TIMEOUT_MS)
+            true
+        }
+    } catch (_: Throwable) {
+        false
+    }
+
+    /** Attende che l'HU sia pronto; false se non lo diventa entro [PROBE_MAX_WAIT_MS]. */
+    private fun waitForHudPort(host: String, port: Int): Boolean {
+        var waited = 0L
+        while (waited < PROBE_MAX_WAIT_MS) {
+            if (stopRequested) return false
+            if (isHudPortOpen(host, port)) {
+                AppLog.i(TAG, "HUD pronto su $host:$port dopo ${waited} ms")
+                return true
+            }
+            try {
+                Thread.sleep(PROBE_INTERVAL_MS)
+            } catch (_: InterruptedException) {
+                return false
+            }
+            waited += PROBE_INTERVAL_MS
+        }
+        return false
     }
 
     private fun connectToHost(host: StreamHost) {
@@ -579,6 +670,7 @@ class HudStreamController(
             scheduleReconnect("creazione sessione fallita: ${t.message}")
             return
         } as MobileSession
+        pendingSession = session
 
         try {
             session.setECHost(host)
@@ -587,8 +679,17 @@ class HudStreamController(
             session.setClockTimeZone(tz.id, tzOffsetSec)
 
             session.startSession()
+
+            // Stop/Pausa puo' arrivare mentre startSession() e' bloccato: senza
+            // questo controllo la sessione appena creata rivitalizzerebbe lo stream.
+            if (stopRequested || streamPaused) {
+                AppLog.i(TAG, "Stop/pausa durante l'handshake: chiudo la sessione creata")
+                closeSessionOnly()
+                return
+            }
         } catch (t: Throwable) {
             AppLog.e(TAG, "startSession fallita", t)
+            if (pendingSession === session) pendingSession = null
             // Caso tipico: TFT spento / fuori portata. NON e' un errore fatale:
             // la MediaProjection resta viva e si riprova piu' tardi.
             scheduleReconnect("handshake fallito: ${t.message}")
@@ -598,6 +699,7 @@ class HudStreamController(
         val elapsed = System.currentTimeMillis() - started
         AppLog.i(TAG, "Sessione HUD pronta in ${elapsed} ms")
 
+        if (pendingSession === session) pendingSession = null
         mobileSession = session
         isRunning = true
         mirrorAttempts = 0
@@ -631,6 +733,13 @@ class HudStreamController(
      */
     private fun scheduleReconnect(reason: String) {
         if (stopRequested) return
+        if (streamPaused) {
+            // In pausa non si riconnette: la sessione, se l'HU l'ha chiusa, viene
+            // solo dimenticata. Al prossimo Avvia se ne apre una nuova.
+            AppLog.i(TAG, "Stream in pausa: nessuna riconnessione ($reason)")
+            if (mobileSession != null || pendingSession != null) closeSessionOnly()
+            return
+        }
         if (reconnectPending) {
             AppLog.i(TAG, "Riconnessione gia' in corso, ignoro: $reason")
             return
@@ -729,6 +838,16 @@ class HudStreamController(
     private fun closeSessionOnly() {
         isRunning = false
         stopDiscoveryInternal()
+
+        pendingSession?.let { session ->
+            try {
+                session.stopSession()
+            } catch (e: Exception) {
+                AppLog.i(TAG, "stopSession su sessione in avvio: ${e.message}")
+            }
+        }
+        pendingSession = null
+
         mobileSession?.let { session ->
             try {
                 session.stopSession()
@@ -991,6 +1110,15 @@ class HudStreamController(
         teardownMirroring()
         stopDiscoveryInternal()
 
+        pendingSession?.let { session ->
+            try {
+                session.stopSession()
+            } catch (e: Exception) {
+                AppLog.e(TAG, "stopSession (in avvio) fallita", e)
+            }
+        }
+        pendingSession = null
+
         mobileSession?.let { session ->
             try {
                 session.stopSession()
@@ -1112,5 +1240,10 @@ class HudStreamController(
 
         /** Porta dell'EC init handshake dell'HU. */
         private const val DEFAULT_HUD_PORT = 10930
+
+        /** Probe di raggiungibilita' dell'HU prima dell'handshake. */
+        private const val PROBE_TIMEOUT_MS = 700
+        private const val PROBE_INTERVAL_MS = 1_000L
+        private const val PROBE_MAX_WAIT_MS = 60_000L
     }
 }

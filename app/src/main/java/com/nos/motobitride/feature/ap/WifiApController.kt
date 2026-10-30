@@ -60,11 +60,27 @@ class WifiApController internal constructor(
     private val handler = Handler(Looper.getMainLooper())
     private var retryRunnable: Runnable? = null
 
+    /** Runnable del lookup peer: va annullato se il tentativo viene rifatto. */
+    private var peerLookupRunnable: Runnable? = null
+
+    /** Vero mentre un tentativo e' in corso (connect inviato, gruppo non ancora pronto). */
+    private var attemptInFlight = false
+
     // ------------------------------------------------------------------
     // API
     // ------------------------------------------------------------------
 
     fun connect(qr: QrContent.HudWifi) {
+        // Un tentativo con queste credenziali e' gia' in corso o il link e' attivo:
+        // rifare il link da zero (removeGroup + nuovo canale) annullava il lavoro in
+        // corso (visto in log: secondo "Avvia" che azzera il primo tentativo).
+        val sameCredentials = savedQr?.ssid == qr.ssid && savedQr?.mac == qr.mac
+        if (sameCredentials && (isHudConnected || attemptInFlight)) {
+            lastEvent = if (isHudConnected) "link gia' attivo" else "tentativo in corso"
+            AppLog.i(TAG, "connect(${qr.ssid}) ignorato: $lastEvent")
+            return
+        }
+
         savedQr = qr
         autoRetryEnabled = true
         retryAttempt = 0
@@ -105,6 +121,7 @@ class WifiApController internal constructor(
 
     private fun startAttempt(qr: QrContent.HudWifi, firstAttempt: Boolean) {
         teardownP2p()
+        attemptInFlight = true
 
         if (firstAttempt) {
             lastEvent = "connessione P2P"
@@ -120,6 +137,9 @@ class WifiApController internal constructor(
                 AppLog.e(TAG, "WifiP2pManager non disponibile su questo device")
                 lastEvent = "P2P non disponibile"
                 autoRetryEnabled = false
+                // Senza questo, attemptInFlight resterebbe true e ogni successivo
+                // "Avvia" verrebbe ignorato dal coalescing.
+                attemptInFlight = false
                 return
             }
             p2pManager = manager
@@ -207,30 +227,48 @@ class WifiApController internal constructor(
             }
         })
 
-        val runnable = Runnable {
-            val mgr = p2pManager
-            val ch = p2pChannel
-            if (mgr == null || ch == null || isHudConnected) return@Runnable
+        // Il peer viene cercato SUBITO e poi a ogni evento PEERS_CHANGED / ogni
+        // secondo, finche' non compare. Prima si attendevano 6 s fissi: nel log il
+        // peer era visibile molto prima e il connect partiva in ritardo.
+        val poll = object : Runnable {
+            var tries = 0
 
-            mgr.requestPeers(ch) { peers ->
-                val match = peers.deviceList.firstOrNull { device ->
-                    device.deviceAddress.equals(qr.mac, ignoreCase = true) ||
-                            (device.deviceName.isNotEmpty() &&
-                                    qr.ssid.contains(device.deviceName, ignoreCase = true)) ||
-                            (device.deviceName.isNotEmpty() &&
-                                    device.deviceName.contains("VOGE", ignoreCase = true))
-                }
-                if (match == null) {
-                    AppLog.w(TAG, "nessun peer corrispondente (${peers.deviceList.size} trovati)")
-                    lastEvent = "P2P: nessun peer"
-                    scheduleRetry("nessun peer")
-                } else {
-                    AppLog.i(TAG, "peer trovato: ${match.deviceName} ${match.deviceAddress}")
-                    connectToPeer(mgr, ch, match.deviceAddress, qr)
+            override fun run() {
+                if (isHudConnected) return
+                val mgr = p2pManager ?: return
+                val ch = p2pChannel ?: return
+
+                mgr.requestPeers(ch) { peers ->
+                    if (isHudConnected) return@requestPeers
+
+                    val match = peers.deviceList.firstOrNull { device ->
+                        device.deviceAddress.equals(qr.mac, ignoreCase = true) ||
+                                (device.deviceName.isNotEmpty() &&
+                                        qr.ssid.contains(device.deviceName, ignoreCase = true)) ||
+                                (device.deviceName.isNotEmpty() &&
+                                        device.deviceName.contains("VOGE", ignoreCase = true))
+                    }
+
+                    if (match != null) {
+                        peerLookupRunnable = null
+                        AppLog.i(TAG, "peer trovato: ${match.deviceName} ${match.deviceAddress}")
+                        connectToPeer(mgr, ch, match.deviceAddress, qr)
+                    } else {
+                        AppLog.i(TAG, "nessun peer corrispondente (${peers.deviceList.size} trovati)")
+                        lastEvent = "P2P: nessun peer"
+                        tries++
+                        if (tries < PEER_POLL_MAX) {
+                            handler.postDelayed(this, PEER_POLL_MS)
+                        } else {
+                            peerLookupRunnable = null
+                            scheduleRetry("nessun peer")
+                        }
+                    }
                 }
             }
         }
-        handler.postDelayed(runnable, PEER_LOOKUP_DELAY_MS)
+        peerLookupRunnable = poll
+        handler.post(poll)
     }
 
     private fun connectToPeer(
@@ -244,8 +282,9 @@ class WifiApController internal constructor(
         } catch (t: Throwable) {
             AppLog.e(TAG, "MAC non valido: $deviceAddress", t)
             lastEvent = "P2P MAC non valido"
-            // MAC sbagliato: nessun retry automatico utile
-            autoRetryEnabled = false
+            // Con autoRetryEnabled = false il link restava morto per sempre.
+            // Si riprova: il tentativo successivo torna alla discovery.
+            scheduleRetry("MAC non valido")
             return
         }
 
@@ -264,6 +303,8 @@ class WifiApController internal constructor(
         } catch (t: Throwable) {
             AppLog.e(TAG, "config P2P non valida", t)
             lastEvent = "P2P config non valida"
+            // Anche qui: senza retry il tentativo si fermava definitivamente.
+            scheduleRetry("config P2P non valida")
             return
         }
 
@@ -297,8 +338,14 @@ class WifiApController internal constructor(
                             handleConnectionInfo(info)
                         }
 
-                    WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION ->
+                    WifiP2pManager.WIFI_P2P_PEERS_CHANGED_ACTION -> {
                         AppLog.i(TAG, "lista peer aggiornata")
+                        // Lista aggiornata: si anticipa il prossimo giro di lookup.
+                        peerLookupRunnable?.let {
+                            handler.removeCallbacks(it)
+                            it.run()
+                        }
+                    }
 
                     WifiP2pManager.WIFI_P2P_STATE_CHANGED_ACTION -> {
                         val state = intent.getIntExtra(
@@ -341,6 +388,15 @@ class WifiApController internal constructor(
             return
         }
         if (!info.groupFormed) {
+            // Durante la negoziazione arriva CONNECTION_CHANGED con groupFormed=false
+            // PRIMA che il gruppo esista. Trattarlo come "link perso" armava un retry
+            // che 6 s dopo smontava il gruppo appena formato (visto in log: connesso
+            // alle 09:42:17.256, perso alle 09:42:23.111). Se non eravamo connessi
+            // e' solo un transiente.
+            if (!isHudConnected) {
+                AppLog.i(TAG, "gruppo P2P non ancora formato (negoziazione in corso)")
+                return
+            }
             AppLog.w(TAG, "gruppo P2P non formato")
             markDisconnected("gruppo P2P non formato")
             return
@@ -359,6 +415,11 @@ class WifiApController internal constructor(
     }
 
     private fun teardownP2p() {
+        // Il lookup del tentativo precedente non deve piu' agire: altrimenti
+        // rieseguirebbe un connect sui campi del tentativo nuovo.
+        peerLookupRunnable?.let { handler.removeCallbacks(it) }
+        peerLookupRunnable = null
+
         p2pReceiver?.let {
             runCatching { context.unregisterReceiver(it) }
         }
@@ -386,8 +447,11 @@ class WifiApController internal constructor(
     // ------------------------------------------------------------------
 
     private fun markConnected(ip: String?) {
-        retryAttempt = 0
-        retryDelayMs = RETRY_MIN_DELAY_MS
+        // Un link riuscito deve annullare OGNI retry pendente: il runnable armato
+        // durante la negoziazione altrimenti rifa' il tentativo e smonta il gruppo
+        // appena formato. (Annulla anche retryAttempt e retryDelayMs.)
+        cancelPendingRetry()
+        attemptInFlight = false
 
         if (isHudConnected && hudIp == ip) return
         isHudConnected = true
@@ -398,6 +462,7 @@ class WifiApController internal constructor(
     }
 
     private fun markDisconnected(reason: String) {
+        attemptInFlight = false
         if (isHudConnected) {
             isHudConnected = false
             hudIp = null
@@ -423,7 +488,9 @@ class WifiApController internal constructor(
         /** Porta dell'EC init handshake dell'HU. */
         const val DEFAULT_HUD_PORT = 10930
 
-        private const val PEER_LOOKUP_DELAY_MS = 6_000L
+        /** Lookup peer: primo giro subito, poi uno al secondo fino a ~10 s. */
+        private const val PEER_POLL_MS = 1_000L
+        private const val PEER_POLL_MAX = 10
 
         // Retry del gruppo P2P: da 3 s a 10 s, illimitati finche' non si ferma.
         private const val RETRY_MIN_DELAY_MS = 3_000L
