@@ -9,7 +9,7 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 > PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** — il resto resta identico per sempre.
 
 ```powershell
-$v   = 'Motobit_alfa_V1.0.5'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.5', ...)
+$v   = 'Motobit_alfa_V1.0.7'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.7', ...)
 $dev = 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev'
 $zip = Join-Path $dev "dev_backup\$v.zip"
 tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* $v
@@ -20,7 +20,7 @@ tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gra
 Verifica (stessa logica, un solo punto da cambiare):
 
 ```powershell
-$v   = 'Motobit_alfa_V1.0.5'
+$v   = 'Motobit_alfa_V1.0.7'
 $zip = Join-Path 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup' "$v.zip"
 Get-Item $zip | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}
 tar -tf $zip | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
@@ -36,7 +36,7 @@ Sorgente unica di verità: **`MOTO_VERSION` in `gradle.properties`**. Non toccar
 
 ```properties
 # gradle.properties
-MOTO_VERSION=1.0.5-alfa
+MOTO_VERSION=1.0.7-alfa
 ```
 
 `versionCode` si calcola da sé: `X.Y.Z` → `X*1000 + Y*100 + Z`
@@ -46,10 +46,46 @@ MOTO_VERSION=1.0.5-alfa
 | 1.0.3-alfa | 1003 |
 | 1.0.4-alfa | 1004 |
 | 1.0.5-alfa | 1005 |
+| 1.0.6-alfa | 1006 |
+| 1.0.7-alfa | 1007 |
 | 1.1.0-alfa | 1100 |
 | 2.0.0-alfa | 2000 |
 
 Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non è nel formato `X.Y.Z`, Gradle si ferma con errore (voluto).
+
+---
+
+## Motobit_alfa_V1.0.7 — 2026-10-31
+
+Base: sorgenti dell'app **1.0.5** ripristinati dallo zip `dev_backup\Motobit_alfa_V1.0.5.zip`
+(`git diff` vuoto rispetto al commit `a61e2f4`), più una correzione nella libreria Go.
+La serie 1.0.6 è stata sperimentata e **non rilasciata**: non esiste come versione.
+
+- Corretto (libreria `hud/net/pxc.go`): **scrittura atomica dei pacchetti PXC**. `writeResponse`
+  inviava header e corpo con **5 `Write` separate**; sulla stessa connessione scrivono due
+  goroutine (servizio dei comandi + clock push), quindi i pezzi potevano intercalarsi e il TFT
+  riceveva un pacchetto corrotto. Ora il pacchetto è costruito in memoria e inviato con **una
+  sola `Write`** (atomica sul socket TCP).
+- Corretto (libreria `hud/net/stream_ctrl.go`): stessa correzione sul canale MediaControl
+  (3 `Write` + payload → una sola).
+- Aggiunto (libreria `hud/net/pxc.go`): classificazione degli errori per capire **chi** chiude
+  la sessione: `REMOTE_CLOSE`, `REMOTE_CLOSE_PARTIAL`, `READ_TIMEOUT`, `LOCAL_STOP`,
+  `PROTOCOL_ERROR`, `WRITE_ERROR`, `READ_ERROR`. Il `magic check` fallito ora produce un
+  `PROTOCOL_ERROR` con i valori (prima usciva in silenzio).
+- Aggiunto (libreria `hud/net/pxc_test.go`): `TestPXCConcurrentWritesDoNotInterleave`.
+  Con il codice precedente **fallisce 3/3** (`body corrotto`, `size=65537`), con la correzione passa.
+- Invariato: logica dell'orologio (formato, ordine, timing, 60 invii in 15 s), encoder H.264,
+  negoziazione risoluzione, Wi-Fi Direct, e **tutto il codice Kotlin dell'app** (è la 1.0.5).
+- Noto (da affrontare dopo): il **retry P2P** di `WifiApController` non si riprende se
+  `discoverPeers` risponde `ERROR` — crea un canale nuovo a ogni tentativo, non chiama
+  `stopPeerDiscovery` e non attende `removeGroup`. Documentato nel log del 31/10 22:16-22:23
+  (34 tentativi, 6 minuti, `0 trovati`).
+- Noto: differenza residua di alcuni secondi sull'orologio del TFT (problema separato).
+- Verificato: 455 s di streaming continuo senza errori (21:59:11 → 22:06:46), contro una
+  mediana precedente di ~130 s. Test lungo su strada ancora da fare.
+
+Backup: SI → `dev_backup\Motobit_alfa_V1.0.7.zip`
+APK: `_versions\Motobit_alfa_V1.0.7.apk` · versionCode **1007** · `1.0.7-alfa` · testato: parzialmente (7,5 min)
 
 ---
 
