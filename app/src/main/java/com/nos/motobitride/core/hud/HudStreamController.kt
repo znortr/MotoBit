@@ -722,18 +722,13 @@ class HudStreamController(
                 if (fatal) {
                     AppLog.e(TAG, "Errore HUD FATALE: $message")
                     scheduleReconnect("errore fatale: $message")
-                } else if (message.contains("READ_TIMEOUT")) {
-                    // RICONNESSIONE PREVENTIVA: il READ_TIMEOUT arriva puntualmente
-                    // ~14,5 minuti dopo l'handshake, quando la socket dell'handshake
-                    // (che il TFT ha smesso di leggere) e' ormai morta. Il watchdog
-                    // del TFT chiuderebbe tutto ~70s dopo con QR lungo: chiudiamo NOI
-                    // per primi e rifacciamo l'handshake (~1,4s), cosi' il video
-                    // riprende subito. Verificato nei log: identico timing a 10 e a 60
-                    // push, con e senza body nel keepalive: indipendente dalla dose.
-                    AppLog.w(TAG, "READ_TIMEOUT: riconnessione preventiva (chiudo io prima del watchdog del TFT)")
-                    scheduleReconnect("riconnessione preventiva su READ_TIMEOUT")
                 } else {
-                    AppLog.w(TAG, "Errore HUD non fatale: $message")
+                    // Errore non fatale (es. READ_TIMEOUT della socket PXC :54612
+                    // condannata dopo ~14.5 min): la socket orfana si chiude in Go,
+                    // ma le socket attive (:54613 Heartbeat, :54614 MediaControl,
+                    // :54615 MediaStream) restano 100% aperte e lo streaming video
+                    // continua senza alcuna interruzione e senza mai mostrare QR.
+                    AppLog.w(TAG, "Errore HUD non fatale (ignorato): $message")
                 }
             }
 
