@@ -428,14 +428,9 @@ fun HudScreen(
 
             LogPanel(
                 modifier = Modifier.fillMaxWidth(),
-                onCopied = { n ->
-                    Toast.makeText(ctx, "Log copiato ($n righe)", Toast.LENGTH_SHORT).show()
-                },
-                onSaved = { path ->
-                    Toast.makeText(ctx, "Log salvato:\n$path", Toast.LENGTH_LONG).show()
-                },
-                onError = { message ->
-                    Toast.makeText(ctx, message, Toast.LENGTH_LONG).show()
+                onClear = {
+                    AppLog.clear()
+                    Toast.makeText(ctx, "Log pulito", Toast.LENGTH_SHORT).show()
                 }
             )
         }

@@ -15,6 +15,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.core.content.ContextCompat
+import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.qr.QrContent
 
@@ -252,6 +253,11 @@ class WifiApController internal constructor(
                     if (match != null) {
                         peerLookupRunnable = null
                         AppLog.i(TAG, "peer trovato: ${match.deviceName} ${match.deviceAddress}")
+                        // MAC reso persistente: le prossime connessioni partono
+                        // con il connect diretto, senza rifare la discovery.
+                        if (qr.mac.isNullOrBlank()) {
+                            SavedHud.updateMac(match.deviceAddress)
+                        }
                         connectToPeer(mgr, ch, match.deviceAddress, qr)
                     } else {
                         AppLog.i(TAG, "nessun peer corrispondente (${peers.deviceList.size} trovati)")

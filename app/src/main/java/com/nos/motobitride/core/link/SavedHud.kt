@@ -137,4 +137,18 @@ object SavedHud {
         prefs?.edit()?.remove(KEY_HUD)?.apply()
         AppLog.w(TAG, "HUD salvato dimenticato")
     }
+
+    /**
+     * Rende persistente il MAC scoperto via discoverPeers: le connessioni
+     * successive partono con il connect diretto, senza discovery (~2-3s
+     * risparmiati per avvio e meno BUSY al primo tentativo).
+     */
+    fun updateMac(mac: String) {
+        val current = _current.value ?: return
+        if (mac.isBlank() || current.mac == mac) return
+        val updated = current.copy(mac = mac)
+        _current.value = updated
+        prefs?.edit()?.putString(KEY_HUD, updated.toJson())?.apply()
+        AppLog.i(TAG, "MAC memorizzato dall'ultima scansione: ${updated.displayName} -> $mac")
+    }
 }

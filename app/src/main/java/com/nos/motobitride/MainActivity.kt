@@ -8,6 +8,7 @@ import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.rememberNavController
 import com.nos.motobitride.core.link.SavedHud
+import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.navigation.AppNavGraph
 import com.nos.motobitride.ui.theme.MotobitRideTheme
@@ -19,6 +20,14 @@ class MainActivity : ComponentActivity() {
         // Impostazioni e HUD memorizzato vanno caricati prima della UI
         AppSettings.init(applicationContext)
         SavedHud.init(applicationContext)
+
+        // Abilita il salvataggio automatico del log su file (Documenti):
+        // i test lunghi superano il ring buffer e perderebbero l'inizio.
+        AppLog.attach(applicationContext)
+        try {
+            AppLog.i("AppLog", "Log su file: " + AppLog.currentLogFileName())
+        } catch (_: Throwable) {
+        }
 
         setContent {
             MotobitRideTheme {

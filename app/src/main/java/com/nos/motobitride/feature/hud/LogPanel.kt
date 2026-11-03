@@ -1,8 +1,5 @@
 package com.nos.motobitride.feature.hud
 
-import android.content.ClipData
-import android.content.ClipboardManager
-import android.content.Context
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
@@ -25,28 +22,21 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.nos.motobitride.core.log.AppLog
-import java.io.File
-import java.text.SimpleDateFormat
-import java.util.Date
-import java.util.Locale
 
 /**
- * Finestra di log in-app: mostra gli eventi del protocollo HUD,
- * con copia negli appunti e salvataggio su file .txt.
+ * Finestra di log in-app: mostra gli eventi del protocollo HUD.
+ * Il salvataggio su file e' automatico (Documenti) quando la diagnostica
+ * e' attiva: per questo non ci sono i tasti Copia/Salva.
  */
 @Composable
 fun LogPanel(
     modifier: Modifier = Modifier,
-    onCopied: (Int) -> Unit = {},
-    onSaved: (String) -> Unit = {},
-    onError: (String) -> Unit = {}
+    onClear: () -> Unit = {}
 ) {
-    val context = LocalContext.current
     val version by AppLog.version.collectAsState()
     val entries = remember(version) { AppLog.entries() }
     val listState = rememberLazyListState()
@@ -67,42 +57,8 @@ fun LogPanel(
                 style = MaterialTheme.typography.labelLarge
             )
 
-            Row {
-                TextButton(onClick = {
-                    try {
-                        val clipboard = context.getSystemService(Context.CLIPBOARD_SERVICE)
-                                as ClipboardManager
-                        clipboard.setPrimaryClip(
-                            ClipData.newPlainText("MotoBit log", AppLog.asText())
-                        )
-                        onCopied(entries.size)
-                    } catch (t: Throwable) {
-                        onError("Copia fallita: ${t.message}")
-                    }
-                }) {
-                    Text("Copia")
-                }
-
-                TextButton(onClick = {
-                    try {
-                        val dir = File(context.getExternalFilesDir(null), "logs")
-                        if (!dir.exists()) dir.mkdirs()
-                        val name = "motobit-log-" +
-                                SimpleDateFormat("yyyyMMdd-HHmmss", Locale.US)
-                                    .format(Date()) + ".txt"
-                        val file = File(dir, name)
-                        file.writeText(AppLog.asText())
-                        onSaved(file.absolutePath)
-                    } catch (t: Throwable) {
-                        onError("Salvataggio fallito: ${t.message}")
-                    }
-                }) {
-                    Text("Salva .txt")
-                }
-
-                TextButton(onClick = { AppLog.clear() }) {
-                    Text("Pulisci")
-                }
+            TextButton(onClick = { onClear() }) {
+                Text("Pulisci")
             }
         }
 

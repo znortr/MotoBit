@@ -2,6 +2,7 @@ package com.nos.motobitride.feature.settings
 
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -33,6 +34,7 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
@@ -49,12 +51,15 @@ private const val TAG = "SettingsScreen"
 @OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun SettingsScreen(
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onOpenDiagnostics: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
     val startup by AppSettings.startup.collectAsState()
     val savedHud by SavedHud.current.collectAsState()
     val idleMinutes by AppSettings.encoderIdleMinutes.collectAsState()
+    val clockPushCount by AppSettings.clockPushCount.collectAsState()
+    val diagLogEnabled by AppSettings.diagLogEnabled.collectAsState()
 
     // Stato dell'esenzione batteria, riletto periodicamente: al ritorno dal
     // dialog di sistema la schermata non riceve altre notifiche.
@@ -202,6 +207,69 @@ fun SettingsScreen(
                         AppSettings.MIN_ENCODER_IDLE_MINUTES - 1,
                 modifier = Modifier.fillMaxWidth()
             )
+
+            HorizontalDivider()
+            Text("Sincronizzazione orologio TFT", style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = "Il TFT imposta l'orario solo ricevendo una raffica di " +
+                        "pacchetti ora all'apertura della connessione (uno ogni 250 ms). " +
+                        "Troppi pacchetti intasano la connessione, troppo pochi lasciano " +
+                        "l'orario a 00.MM. Questo valore e' il numero di pacchetti " +
+                        "inviati: usalo per trovare il minimo che imposta l'ora " +
+                        "(es. prova 20, poi 30, poi 40...).",
+                style = MaterialTheme.typography.bodySmall
+            )
+            var pushValue by remember(clockPushCount) {
+                mutableStateOf(clockPushCount.toFloat())
+            }
+            Text(
+                text = "Push orologio: ${pushValue.roundToInt()} pacchetti",
+                style = MaterialTheme.typography.bodyLarge
+            )
+            Slider(
+                value = pushValue,
+                onValueChange = { pushValue = it },
+                onValueChangeFinished = {
+                    AppSettings.setClockPushCount(pushValue.roundToInt())
+                },
+                valueRange = AppSettings.MIN_CLOCK_PUSH_COUNT.toFloat()..
+                        AppSettings.MAX_CLOCK_PUSH_COUNT.toFloat(),
+                // Scala a step di 10: 10, 20, 30, 40, 50, 60.
+                steps = (AppSettings.MAX_CLOCK_PUSH_COUNT -
+                        AppSettings.MIN_CLOCK_PUSH_COUNT) / 10 - 1,
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            HorizontalDivider()
+            Text("Diagnostica", style = MaterialTheme.typography.titleMedium)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clickable(onClick = onOpenDiagnostics)
+                    .padding(vertical = 12.dp),
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Column(Modifier.weight(1f)) {
+                    Text(
+                        text = "Log e diagnostica",
+                        style = MaterialTheme.typography.bodyLarge
+                    )
+                    Text(
+                        text = "Apre la finestra del log con l'interruttore.",
+                        style = MaterialTheme.typography.bodySmall
+                    )
+                }
+                Text(
+                    text = if (diagLogEnabled) "LogON" else "LogOFF",
+                    color = if (diagLogEnabled) Color(0xFFFF4444) else Color(0xFF4CAF50),
+                    style = MaterialTheme.typography.labelLarge
+                )
+                Text(
+                    text = "\u25B8",
+                    color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
+                    style = MaterialTheme.typography.titleLarge
+                )
+            }
 
             HorizontalDivider()
             Text("HUD memorizzato", style = MaterialTheme.typography.titleMedium)

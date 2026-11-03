@@ -6,10 +6,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.NavHostController
 import androidx.navigation.compose.composable
 import com.nos.motobitride.core.qr.QrContent
+import com.nos.motobitride.feature.ap.QrScanScreen
+import com.nos.motobitride.feature.diagnostics.DiagnosticsScreen
 import com.nos.motobitride.feature.hud.HudScreen
 import com.nos.motobitride.feature.login.LoginScreen
 import com.nos.motobitride.feature.settings.SettingsScreen
-import com.nos.motobitride.feature.ap.QrScanScreen
 
 @Composable
 fun AppNavGraph (
@@ -59,6 +60,19 @@ fun AppNavGraph (
             SettingsScreen(
                 onBack = {
                     if (navController.currentDestination?.route == AppDestination.Settings.route) {
+                        navController.popBackStack()
+                    }
+                },
+                onOpenDiagnostics = {
+                    navController.navigate(AppDestination.Diagnostics.route)
+                }
+            )
+        }
+
+        composable(AppDestination.Diagnostics.route) {
+            DiagnosticsScreen(
+                onBack = {
+                    if (navController.currentDestination?.route == AppDestination.Diagnostics.route) {
                         navController.popBackStack()
                     }
                 }

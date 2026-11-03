@@ -20,6 +20,7 @@ import api.MobileConfig
 import api.MobileSession
 import api.StreamHost
 import com.nos.motobitride.core.log.AppLog
+import com.nos.motobitride.core.settings.AppSettings
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -115,6 +116,12 @@ class HudStreamController(
     private var isRunning = false
     @Volatile
     private var isDiscovering = false
+
+    // Lock radio tenuto per tutto il mirroring: senza, il power-save del Wi-Fi
+    // Direct puo' addormentare la radio e uccidere i canali TCP verso il TFT
+    // (l'app ufficiale Carbit-Ride non presenta il problema, quindi e' un
+    // comportamento dipendente dalla nostra app).
+    private var wifiLock: WifiManager.WifiLock? = null
     @Volatile
     private var stopRequested = false
 
@@ -127,6 +134,29 @@ class HudStreamController(
 
     private var mirrorAttempts = 0
     private var watchdogActive = false
+
+    /** Timer diagnostico aggregato dei tre canali: nessun evento grezzo. */
+    private var channelDiagnosticsActive = false
+    private val channelDiagnosticsRunnable = object : Runnable {
+        override fun run() {
+            if (!channelDiagnosticsActive) return
+            val session = mobileSession
+            if (isRunning && session != null) {
+                // Diagnostica disabilitata (Impostazioni -> Diagnostica): il
+                // tick resta (costo nullo) ma non si costruisce lo snapshot.
+                if (AppLog.isDiagnosticsEnabled()) {
+                    try {
+                        AppLog.i(TAG, "CHANNEL_DIAG ${session.diagnosticsSnapshot()}")
+                    } catch (t: Throwable) {
+                        AppLog.w(TAG, "CHANNEL_DIAG snapshot non disponibile: ${t.message}")
+                    }
+                }
+                mainHandler.postDelayed(this, CHANNEL_DIAGNOSTICS_INTERVAL_MS)
+            } else {
+                channelDiagnosticsActive = false
+            }
+        }
+    }
 
     // Riconnessione: illimitata finche' l'utente non preme Stop, con backoff.
     private var reconnectAttempt = 0
@@ -414,6 +444,8 @@ class HudStreamController(
             return
         }
 
+        acquireStreamLocks()
+
         stopRequested = false
         streamPaused = false
         mirrorAttempts = 0
@@ -444,6 +476,38 @@ class HudStreamController(
     }
 
     /**
+     * Acquisisce WifiLock in modalita' FULL_HIGH_PERF + MulticastLock: tengono
+     * sveglia la radio Wi-Fi per tutto il mirroring e impediscono al power-save
+     * di degradare i canali TCP verso il TFT.
+     */
+    private fun acquireStreamLocks() {
+        if (wifiLock?.isHeld == true) return
+        try {
+            wifiLock = wifiManager.createWifiLock(
+                WifiManager.WIFI_MODE_FULL_HIGH_PERF, "motobit:stream"
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            AppLog.i(TAG, "WIFI_LOCK acquisito (WIFI_MODE_FULL_HIGH_PERF)")
+        } catch (t: Throwable) {
+            AppLog.w(TAG, "WIFI_LOCK non acquisito: ${t.message}")
+        }
+    }
+
+    private fun releaseStreamLocks() {
+        try {
+            if (wifiLock?.isHeld == true) {
+                wifiLock?.release()
+                AppLog.i(TAG, "WIFI_LOCK rilasciato")
+            }
+        } catch (t: Throwable) {
+            AppLog.w(TAG, "WIFI_LOCK release fallito: ${t.message}")
+        }
+        wifiLock = null
+    }
+
+    /**
      * Imposta l'host dell'HU ricavato dal link Wi-Fi (gateway o group owner P2P).
      * Se valorizzato, `start()` non usa mDNS.
      */
@@ -461,6 +525,7 @@ class HudStreamController(
         stopWatchdog()
         cancelEncoderIdleTimer()
         isRunning = false
+        releaseStreamLocks()
 
         // Si smette di inviare frame, ma la sessione Go resta aperta.
         if (!encoderPaused) {
@@ -619,6 +684,12 @@ class HudStreamController(
         _status.value = "Connessione all'HUD..."
         AppLog.i(TAG, "Handshake sessione HUD in corso...")
         val started = System.currentTimeMillis()
+        AppLog.i(
+            TAG,
+            "SESSION_DIAG start wall=${java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US).format(java.util.Date())} " +
+                    "elapsedRealtimeMs=${android.os.SystemClock.elapsedRealtime()} " +
+                    "host=${preferredHostIp ?: "mDNS"}:$preferredHostPort"
+        )
 
         // staticSignalBytes vuoto => nessun video di test
         val cfg: MobileConfig = Api.newMobileConfig(
@@ -633,6 +704,15 @@ class HudStreamController(
         val callback = object : MobileCallback {
             override fun onError(msg: String?, fatal: Boolean) {
                 val message = msg ?: "unknown HUD error"
+                if (message.contains("READ_TIMEOUT") || message.contains("EOF") ||
+                    message.contains("WRITE_ERROR") || message.contains("connection abort")
+                ) {
+                    AppLog.w(
+                        TAG,
+                        "SESSION_DIAG callback wall=${java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date())} " +
+                                "elapsedRealtimeMs=${android.os.SystemClock.elapsedRealtime()} fatal=$fatal reason=$message"
+                    )
+                }
                 // Durante uno stop volontario il socket viene chiuso da noi:
                 // non e' un errore da segnalare all'utente.
                 if (stopRequested || !isRunning) {
@@ -642,6 +722,16 @@ class HudStreamController(
                 if (fatal) {
                     AppLog.e(TAG, "Errore HUD FATALE: $message")
                     scheduleReconnect("errore fatale: $message")
+                } else if (message.contains("READ_TIMEOUT")) {
+                    // RICONNESSIONE PREVENTIVA: il READ_TIMEOUT arriva puntualmente
+                    // ~14,5 minuti dopo l'handshake, quando la socket dell'handshake
+                    // (che il TFT ha smesso di leggere) e' ormai morta. Il watchdog
+                    // del TFT chiuderebbe tutto ~70s dopo con QR lungo: chiudiamo NOI
+                    // per primi e rifacciamo l'handshake (~1,4s), cosi' il video
+                    // riprende subito. Verificato nei log: identico timing a 10 e a 60
+                    // push, con e senza body nel keepalive: indipendente dalla dose.
+                    AppLog.w(TAG, "READ_TIMEOUT: riconnessione preventiva (chiudo io prima del watchdog del TFT)")
+                    scheduleReconnect("riconnessione preventiva su READ_TIMEOUT")
                 } else {
                     AppLog.w(TAG, "Errore HUD non fatale: $message")
                 }
@@ -652,6 +742,11 @@ class HudStreamController(
             }
 
             override fun onStopped() {
+                AppLog.w(
+                    TAG,
+                    "SESSION_DIAG stopped wall=${java.text.SimpleDateFormat("HH:mm:ss.SSS", java.util.Locale.US).format(java.util.Date())} " +
+                            "elapsedRealtimeMs=${android.os.SystemClock.elapsedRealtime()} stopRequested=$stopRequested paused=$streamPaused"
+                )
                 if (stopRequested) {
                     AppLog.i(TAG, "Sessione HUD chiusa (stop richiesto)")
                     return
@@ -677,6 +772,9 @@ class HudStreamController(
             val tz = java.util.TimeZone.getDefault()
             val tzOffsetSec = tz.getOffset(System.currentTimeMillis()) / 1000L
             session.setClockTimeZone(tz.id, tzOffsetSec)
+            // Numero di push della raffica orologio scelto nelle Impostazioni
+            // (bisezione 10..60, default 60 = noto-good 1.0.18).
+            session.setClockPushCount(AppSettings.clockPushCount.value.toLong())
 
             session.startSession()
 
@@ -697,6 +795,11 @@ class HudStreamController(
         }
 
         val elapsed = System.currentTimeMillis() - started
+        AppLog.i(
+            TAG,
+            "SESSION_DIAG ready wall=${java.text.SimpleDateFormat("yyyy-MM-dd'T'HH:mm:ss.SSSXXX", java.util.Locale.US).format(java.util.Date())} " +
+                    "elapsedRealtimeMs=${android.os.SystemClock.elapsedRealtime()} handshakeMs=$elapsed"
+        )
         AppLog.i(TAG, "Sessione HUD pronta in ${elapsed} ms")
 
         if (pendingSession === session) pendingSession = null
@@ -724,6 +827,20 @@ class HudStreamController(
         resumeEncoderIfPaused()
 
         startWatchdog()
+        startChannelDiagnostics()
+    }
+
+    /** Avvia il riepilogo diagnostico aggregato dei canali a bassa frequenza. */
+    private fun startChannelDiagnostics() {
+        if (channelDiagnosticsActive) return
+        channelDiagnosticsActive = true
+        AppLog.i(TAG, "CHANNEL_DIAG start interval=${CHANNEL_DIAGNOSTICS_INTERVAL_MS}ms")
+        mainHandler.postDelayed(channelDiagnosticsRunnable, CHANNEL_DIAGNOSTICS_INTERVAL_MS)
+    }
+
+    private fun stopChannelDiagnostics() {
+        channelDiagnosticsActive = false
+        mainHandler.removeCallbacks(channelDiagnosticsRunnable)
     }
 
     /**
@@ -837,6 +954,7 @@ class HudStreamController(
     /** Chiude solo la sessione Go, senza toccare projection/encoder/display. */
     private fun closeSessionOnly() {
         isRunning = false
+        stopChannelDiagnostics()
         stopDiscoveryInternal()
 
         pendingSession?.let { session ->
@@ -1107,6 +1225,7 @@ class HudStreamController(
 
     private fun stopInternal() {
         isRunning = false
+        releaseStreamLocks()
         teardownMirroring()
         stopDiscoveryInternal()
 
@@ -1229,6 +1348,7 @@ class HudStreamController(
         private const val DISCOVERY_TIMEOUT_MS = 8_000L
 
         private const val WATCHDOG_INTERVAL_MS = 1_000L
+        private const val CHANNEL_DIAGNOSTICS_INTERVAL_MS = 30_000L
         private const val MAX_MIRROR_ATTEMPTS = 12
 
         // Riconnessione: illimitata, con backoff da 1 s a 10 s.
