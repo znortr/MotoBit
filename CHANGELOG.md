@@ -55,6 +55,20 @@ Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non �
 
 ---
 
+## Motobit_alfa_V1.1.4 — 2026-11-04
+
+- **Risolto (disconnessioni a 14 min)**: In `hud/net/pxc.go`, la socket 1 di controllo non viene più chiusa in caso di `READ_TIMEOUT` (`if closeReason == "READ_TIMEOUT" { continue }`), rispecchiando il comportamento dell'app Carbit/EasyConn ufficiale (`PXCSocketManager`). La socket 1 resta aperta in stato TCP `ESTABLISHED`, impedendo al TFT di inviare il pacchetto `EOF` dopo 14 minuti.
+- **Corretto (bug `SetClockPushCount`)**: In `hud/core/cfmoto.go`, la funzione `SetClockPushCount` ora salva `hud.clockPushCount = count` ed imposta correttamente il valore scelto nelle Impostazioni dell'app al momento della creazione del server PXC.
+- **Aggiunto (opzione 1 pacchetto orologio al primo frame)**: Aggiunta nelle Impostazioni l'opzione `1 (sincronizzato al primo frame)`. Quando selezionata, la raffica all'handshake viene saltata e viene inviato 1 singolo pacchetto dell'ora in concomitanza con l'evento `MediaCtrl/VideoStart` (primo frame video).
+- **Corretto (tempi morti riconnessione)**: In `HudStreamController.kt`, `RECONNECT_MIN_DELAY_MS` è stato ridotto da `1000ms` a `100ms` per ripristinare la sessione istantaneamente in caso di caduta.
+- **Corretto (socket reuse)**: In Go (`hud/net/listener_posix.go` / `listener_windows.go`), abilitati `SO_REUSEADDR` e `SO_REUSEPORT` sui server TCP per eliminare l'errore `bind: address already in use` e velocizzare la connessione iniziale (handshake in ~700ms).
+- **Verificato sul campo**: 43 minuti consecutivi di streaming video ininterrotto senza disconnessioni, senza riconnessioni e senza mai mostrare il QR code.
+
+Backup: SI → `dev_backup\Motobit_alfa_V1.1.4.zip`
+APK: `_versions\Motobit_alfa_V1.1.4.apk` · versionCode **1104** · `1.1.4` · testato: 100% sul campo (43 min continui)
+
+---
+
 ## Motobit_alfa_V1.0.7 — 2026-10-31
 
 Base: sorgenti dell'app **1.0.5** ripristinati dallo zip `dev_backup\Motobit_alfa_V1.0.5.zip`
