@@ -57,7 +57,7 @@ object AppSettings {
      * di salire se un firmware TFT diverso fosse piu' esigente.
      */
     const val DEFAULT_CLOCK_PUSH_COUNT = 10
-    const val MIN_CLOCK_PUSH_COUNT = 10
+    const val MIN_CLOCK_PUSH_COUNT = 1
     const val MAX_CLOCK_PUSH_COUNT = 60
 
     /**

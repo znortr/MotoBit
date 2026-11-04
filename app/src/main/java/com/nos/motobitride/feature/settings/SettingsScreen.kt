@@ -222,8 +222,14 @@ fun SettingsScreen(
             var pushValue by remember(clockPushCount) {
                 mutableStateOf(clockPushCount.toFloat())
             }
+            val currentPushInt = pushValue.roundToInt()
+            val pushLabel = if (currentPushInt == 1) {
+                "Push orologio: 1 (sincronizzato al primo frame)"
+            } else {
+                "Push orologio: $currentPushInt pacchetti (raffica handshake)"
+            }
             Text(
-                text = "Push orologio: ${pushValue.roundToInt()} pacchetti",
+                text = pushLabel,
                 style = MaterialTheme.typography.bodyLarge
             )
             Slider(
@@ -234,9 +240,7 @@ fun SettingsScreen(
                 },
                 valueRange = AppSettings.MIN_CLOCK_PUSH_COUNT.toFloat()..
                         AppSettings.MAX_CLOCK_PUSH_COUNT.toFloat(),
-                // Scala a step di 10: 10, 20, 30, 40, 50, 60.
-                steps = (AppSettings.MAX_CLOCK_PUSH_COUNT -
-                        AppSettings.MIN_CLOCK_PUSH_COUNT) / 10 - 1,
+                steps = 59,
                 modifier = Modifier.fillMaxWidth()
             )
 

@@ -1282,6 +1282,10 @@ class HudStreamController(
         // MediaCtrlChk = l'HU inizia a consumare il video: chiediamo subito un IDR
         if (source == EVENT_SOURCE_MEDIA_CONTROL && command == MEDIA_CTRL_CHK) {
             encoder?.requestSyncFrame()
+            if (AppSettings.clockPushCount.value == 1) {
+                AppLog.i(TAG, "Invio 1 singolo pacchetto orologio al primo frame video (VideoStart)")
+                mobileSession?.sendSingleClockPush()
+            }
         }
 
         if (isRunning && mediaProjection != null && virtualDisplay == null) {
@@ -1346,8 +1350,8 @@ class HudStreamController(
         private const val CHANNEL_DIAGNOSTICS_INTERVAL_MS = 30_000L
         private const val MAX_MIRROR_ATTEMPTS = 12
 
-        // Riconnessione: illimitata, con backoff da 1 s a 10 s.
-        private const val RECONNECT_MIN_DELAY_MS = 1_000L
+        // Riconnessione: illimitata, istantanea a 100 ms (senza tempi morti), con backoff fino a 10 s.
+        private const val RECONNECT_MIN_DELAY_MS = 100L
         private const val RECONNECT_MAX_DELAY_MS = 10_000L
 
         /** Default: dopo 5 minuti di attesa l'encoder va in pausa (batteria). */
