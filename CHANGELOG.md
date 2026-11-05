@@ -6,13 +6,20 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ## 📋 INCOLLA NEL TERMINALE PER CREARE LO ZIP DI BACKUP
 
-> PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** — il resto resta identico per sempre.
+> PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** (nome dello zip = versione).
+>
+> ⚠️ **`$dir` (cartella da archiviare) NON cambia**: il root del progetto è ancora `Motobit_alfa_V1.0.4`, mentre lo zip prende il nome della versione. Sono due cose distinte.
+>
+> ⚠️ **Esclusi di proposito** (dal 1.1.5): `_versions` (25 APK = 2,5 GB), `.git` (570 MB), i `*_sorgenti.zip` nel root (backup dentro il backup) e i residui `aar-check` / `hudlib-check.zip` / `diagnostica`. Senza questi esclusi lo zip passa da **479 MB a 2,2 GB**.
 
 ```powershell
-$v   = 'Motobit_alfa_V1.0.7'   # <-- UNICA RIGA DA CAMBIARE a ogni versione ($v = 'Motobit_alfa_V1.0.7', ...)
+$v   = 'Motobit_alfa_V1.1.5'   # <-- UNICA RIGA DA CAMBIARE a ogni versione (nome dello zip)
+$dir = 'Motobit_alfa_V1.0.4'   # <-- cartella del progetto (root piatta: NON cambia)
 $dev = 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev'
 $zip = Join-Path $dev "dev_backup\$v.zip"
-tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gradle --exclude=*/.gradle/* --exclude=*/.kotlin --exclude=*/.idea --exclude=*/.idea/* $v
+$ex  = '*/build','*/build/*','*/.gradle','*/.gradle/*','*/.kotlin','*/.idea','*/.idea/*','*/.git','*/.git/*','*/_versions','*/_versions/*','*.zip','*/aar-check','*/aar-check/*','*/diagnostica','*/diagnostica/*'
+if (Test-Path $zip) { Remove-Item $zip }
+tar -a -c -f $zip -C $dev @($ex | ForEach-Object { "--exclude=$_" }) $dir
 ```
 
 > Se dopo il paste il prompt scende su `>>`, la shell sta aspettando una quote chiusa: `Ctrl+C` (una o due volte), poi rilanciare. Incollare riga per riga, un solo Invio.
@@ -20,13 +27,17 @@ tar -a -c -f $zip -C $dev --exclude=*/build --exclude=*/build/* --exclude=*/.gra
 Verifica (stessa logica, un solo punto da cambiare):
 
 ```powershell
-$v   = 'Motobit_alfa_V1.0.7'
+$v   = 'Motobit_alfa_V1.1.5'
 $zip = Join-Path 'H:\userData\Desktop\APP-CARBIT-VOGE\motobitdev\dev_backup' "$v.zip"
 Get-Item $zip | Select-Object Name,@{n='MB';e={[math]::Round($_.Length/1MB,1)}}
-tar -tf $zip | Select-String -Pattern "settings.gradle.kts|hudlib.aar|local.properties|git/HEAD"
+$l = tar -tf $zip
+"VOCI=$($l.Count) BUILD=$(($l|Select-String '/build/').Count) GIT=$(($l|Select-String '/\.git/').Count) VERSIONS=$(($l|Select-String '_versions').Count) APK=$(($l|Select-String '\.apk$').Count)"
+$l | Select-String -Pattern "settings.gradle.kts$|app/libs/hudlib.aar$|local.properties$|gradle.properties$|CHANGELOG.md$"
 ```
 
-Atteso: `0` voci `*/build/*` e `*/.gradle/*` dentro lo zip; `settings.gradle.kts`, `hudlib.aar`, `local.properties`, `.git/HEAD` tutti presenti.
+Atteso: **~479 MB** e `241` voci circa; `BUILD=0 GIT=0 VERSIONS=0 APK=0`; presenti `settings.gradle.kts`, `app/libs/hudlib.aar`, `local.properties`, `gradle.properties`, `CHANGELOG.md`.
+
+> Nota: lo zip **non** contiene la storia git né gli APK archiviati. Restano comunque su disco in `motobit-ride-android/.git`, `motobit-ride-lib/.git` e `_versions/`.
 
 ---
 
