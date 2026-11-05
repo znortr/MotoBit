@@ -39,7 +39,13 @@ import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
+import androidx.compose.ui.text.SpanStyle
+import androidx.compose.ui.text.buildAnnotatedString
+import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.withStyle
+import androidx.compose.ui.tooling.preview.Preview
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -52,6 +58,8 @@ import com.nos.motobitride.core.qr.QrContent
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.core.settings.StartupBehavior
 import com.nos.motobitride.feature.ap.WifiApController
+import com.nos.motobitride.ui.i18n.AppTexts
+import com.nos.motobitride.ui.theme.MotobitRideTheme
 
 private const val TAG_UI = "HudScreen"
 
@@ -117,7 +125,14 @@ fun HudScreen(
     onOpenSettings: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
+    val currentLang by AppSettings.language.collectAsState()
     val permissions = remember { requiredWifiPermissions() }
+
+    val versionName = remember(ctx) {
+        runCatching {
+            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
+        }.getOrNull() ?: "1.1.4"
+    }
 
     val streamState by hudStreamController.state.collectAsState()
     val statusText by hudStreamController.status.collectAsState()
@@ -141,7 +156,6 @@ fun HudScreen(
     }
 
     var projectionRequested by remember { mutableStateOf(false) }
-    // true quando l'utente (o la modalita' di avvio) vuole il video
     var streamRequested by remember { mutableStateOf(false) }
 
     val screenCaptureLauncher = rememberLauncherForActivityResult(
@@ -220,7 +234,6 @@ fun HudScreen(
     LaunchedEffect(hudQrValue) {
         when (hudQrValue) {
             is QrContent.HudWifi -> {
-                // Nuovo QR: lo memorizziamo (sovrascrive il precedente)
                 SavedHud.save(hudQrValue)
 
                 val allGranted = permissions.all { perm ->
@@ -238,8 +251,6 @@ fun HudScreen(
         }
     }
 
-    // Applica la modalita' di avvio una sola volta per sessione app,
-    // usando l'HUD memorizzato (nessun QR necessario).
     var startupApplied by remember { mutableStateOf(false) }
     LaunchedEffect(savedHud) {
         if (startupApplied) return@LaunchedEffect
@@ -280,10 +291,38 @@ fun HudScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("MotoBit") },
+                title = {
+                    Column {
+                        val motoColor = MaterialTheme.colorScheme.onBackground
+                        val bitColor = Color(0xFFFF3B30)
+                        val titleText = remember(motoColor) {
+                            buildAnnotatedString {
+                                withStyle(style = SpanStyle(color = motoColor, fontWeight = FontWeight.Bold)) {
+                                    append("Moto")
+                                }
+                                withStyle(style = SpanStyle(color = bitColor, fontWeight = FontWeight.Bold)) {
+                                    append("Bit")
+                                }
+                            }
+                        }
+                        Text(
+                            text = titleText,
+                            style = MaterialTheme.typography.titleLarge
+                        )
+                        Text(
+                            text = "v$versionName",
+                            style = MaterialTheme.typography.labelSmall,
+                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
+                        )
+                    }
+                },
                 actions = {
-                    TextButton(onClick = onShowQrScanner) { Text("Scan QR") }
-                    TextButton(onClick = onOpenSettings) { Text("Impostazioni") }
+                    TextButton(onClick = onShowQrScanner) {
+                        Text(AppTexts.get("hud_scan_qr", currentLang))
+                    }
+                    TextButton(onClick = onOpenSettings) {
+                        Text(AppTexts.get("settings_title", currentLang))
+                    }
                 }
             )
         }
@@ -309,7 +348,7 @@ fun HudScreen(
                         style = MaterialTheme.typography.titleMedium
                     )
                     Text(
-                        text = "Link Wi-Fi Direct: " +
+                        text = AppTexts.get("hud_status", currentLang) +
                                 (if (linkConnected) "ONLINE" else "OFFLINE") +
                                 "   ip=${wifiController.hudIp ?: "-"}",
                         style = MaterialTheme.typography.bodyMedium
@@ -332,7 +371,8 @@ fun HudScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = "Avvio: ${startupBehavior.label}",
+                        text = AppTexts.get("settings_startup_title", currentLang) +
+                                ": " + AppTexts.get(startupBehavior.labelKey, currentLang),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -352,7 +392,6 @@ fun HudScreen(
 
                                     val hud = savedHud
                                     if (hud != null && !wifiController.isHudConnected) {
-                                        // Ricostruisce il link dalle credenziali salvate
                                         wifiController.connect(hud.toQrContent())
                                     } else if (wifiController.isHudConnected) {
                                         hudStreamController.setPreferredHost(
@@ -364,7 +403,7 @@ fun HudScreen(
                                         AppLog.w(TAG_UI, "Nessun HUD: scansiona il QR")
                                         Toast.makeText(
                                             ctx,
-                                            "Scansiona il QR dell'HUD",
+                                            AppTexts.get("hud_no_saved", currentLang),
                                             Toast.LENGTH_SHORT
                                         ).show()
                                     }
@@ -393,28 +432,28 @@ fun HudScreen(
                     },
                     enabled = !isActive
                 ) {
-                    Text(if (streamState == StreamState.ERROR) "Riprova" else "Avvia")
+                    Text(
+                        if (streamState == StreamState.ERROR)
+                            AppTexts.get("common_retry", currentLang)
+                        else
+                            AppTexts.get("common_start", currentLang)
+                    )
                 }
 
                 OutlinedButton(
                     onClick = {
                         AppLog.i(TAG_UI, "Stop premuto")
                         streamRequested = false
-                        // Stop = PAUSA: la cattura resta attiva, cosi' Avvia riparte subito.
-                        // (Il servizio non va fermato: ucciderebbe la MediaProjection.)
                         hudStreamController.stop()
                     },
                     enabled = isActive
                 ) {
-                    Text("Stop")
+                    Text(AppTexts.get("common_stop", currentLang))
                 }
             }
 
             OutlinedButton(
                 onClick = {
-                    // Chiudi: ferma lo stream, rilascia il link e termina l'app.
-                    // Usa solo API gia' presenti (stop/disconnect/stopService):
-                    // nessuna modifica alla logica di connessione.
                     AppLog.i(TAG_UI, "Chiudi premuto")
                     streamRequested = false
                     hudStreamController.close()
@@ -423,16 +462,16 @@ fun HudScreen(
                     ctx.getActivity()?.finishAndRemoveTask()
                 }
             ) {
-                Text("Chiudi")
+                Text(AppTexts.get("common_close", currentLang))
             }
-
-            LogPanel(
-                modifier = Modifier.fillMaxWidth(),
-                onClear = {
-                    AppLog.clear()
-                    Toast.makeText(ctx, "Log pulito", Toast.LENGTH_SHORT).show()
-                }
-            )
         }
+    }
+}
+
+@Preview(showBackground = true)
+@Composable
+fun HudScreenPreview() {
+    MotobitRideTheme {
+        HudScreen(hudQrValue = null)
     }
 }

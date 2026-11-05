@@ -55,6 +55,24 @@ Regola: `versionCode` deve sempre crescere; se il valore in `MOTO_VERSION` non �
 
 ---
 
+## Motobit_alfa_V1.1.5 — 2026-11-05
+
+- **Risolto (disconnessioni a ~37 min) — causa MISURATA, non ipotizzata**: il push dell'ora NON richiesto (`PxcTimeSyncAck`, `0x10451`) inviato ogni 5 minuti sulla socket di controllo PXC (`:54612`) **non viene letto dal TFT**: resta in coda TCP non confermata con RTO in backoff esponenziale (448 ms → 25 s → 50 s → **101 s**, `backoff=8`). Poiché TCP consegna in ordine, quel segmento **blocca gli ACK `0x10631`** dovuti alle richieste periodiche del TFT (`0x10630`, ogni ~60 s). Il TFT resta senza risposta e **chiude la socket ~48 s dopo** (`lastClose="REMOTE_CLOSE afterLastRX=48.378s afterLastTX=48.378s"`), poi **abbatte MediaStream ~73 s dopo** (`error reading header: EOF`) → `StopStream` → riconnessione.
+  - Evidenza nei `CHANNEL_DIAG`: `retrans=1` con RTO crescente su `:54612` **esattamente** dopo ogni `0x10451` (08:42:00 → backoff 8; 08:47:00 → backoff 7), mentre durante tutta la jam `MediaStream` continuava a ricevere poll (`lastRX=22ms`, `polls=67179`): il video era vivo, il canale di controllo no.
+- **Corretto**: `startKeepaliveClockPush()` in `hud/net/clocksync.go` ora parte **DISATTIVATO** (campo `periodicKeepalive`, default `false`). Il TFT **non** ha bisogno di traffico non richiesto: la sua richiesta `0x10630` ogni ~60 s è già la keepalive, e gli rispondiamo come sempre (la risposta vive in `handleEvent`, non nel keepalive).
+- **Dimostrato che la raffica iniziale non è la causa**: `:54612` senza `retrans` per i primi ~30 minuti (08:39:30 → `retrans=0 timer=off`); la jam compare solo con i push periodici. Quindi la raffica all'handshake (3..60) resta invariata.
+- **Rimosso (codice morto)**: tutto il percorso "1 pacchetto al primo frame" — `PXCControl.SendSingleClockPush`, `CfmotoHUD.SendSingleClockPush`, `MobileSession.SendSingleClockPush` e il ramo Kotlin `if (clockPushCount.value == 1)`. L'opzione era già stata eliminata dallo slider e il codice non era più raggiungibile. Guardia della raffica corretta da `count <= 1` a `count <= 0`: il valore **0** resta valido per TFT che non richiedono la raffica; **minimo e default restano 3** (range 3..60).
+- **Aggiunto (solo per bisazione)**: interruttore in **Diagnostica** → *"Keepalive orologio periodico PXC (5 min)"*, **default OFF**, così in strada è possibile riaccenderlo **senza ricompilare l'AAR** (`MobileSession.SetPeriodicClockKeepalive`).
+- **Invariato**: raffica iniziale dell'ora (3..60, default 3), risposta a `0x10450` (richiesta ora del TFT), risposta a `0x10630`, socket heartbeat `:54613`, MediaControl, MediaStream, encoder, Wi-Fi Direct.
+- **Noto**: a **freddo** (primo avvio) la raffica da **3** pacchetti può non bastare a impostare l'ora sul TFT; basta salire a 5 una volta, poi l'ora rimane anche tornando a 3. Default 3 confermato per scelta.
+- **Verificato sul campo**: **1 ora e 34 minuti** di streaming continuo **senza alcuna disconnessione**, senza riconnessioni e senza QR. Criterio di verifica: `retrans=0 timer=off` stabile su `192.168.13.1:54612` nei `CHANNEL_DIAG` ogni 30 s.
+- **Toolchain**: `gomobile` riallineato (`v0.0.0-20251126181937-5c265dc024c4`) e `-androidapi 21` obbligatorio (con API 16 il bind fallisce: `unsupported API version 16 (not in 21..37)`).
+
+Backup: SI → `dev_backup\Motobit_alfa_V1.1.5.zip`
+APK: `_versions\Motobit_1.1.5.apk` · versionCode **1105** · `1.1.5` · SHA256 `EA423BEB197CF421D3A1001A13E6FE366E794BBD64E92A529DEE15A81CE1D896` · testato: 100% sul campo (1h34m continui)
+
+---
+
 ## Motobit_alfa_V1.1.4 — 2026-11-04
 
 - **Risolto (disconnessioni a 14 min)**: In `hud/net/pxc.go`, la socket 1 di controllo non viene più chiusa in caso di `READ_TIMEOUT` (`if closeReason == "READ_TIMEOUT" { continue }`), rispecchiando il comportamento dell'app Carbit/EasyConn ufficiale (`PXCSocketManager`). La socket 1 resta aperta in stato TCP `ESTABLISHED`, impedendo al TFT di inviare il pacchetto `EOF` dopo 14 minuti.

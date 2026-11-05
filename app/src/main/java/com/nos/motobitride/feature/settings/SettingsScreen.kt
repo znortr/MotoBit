@@ -14,10 +14,14 @@ import androidx.compose.foundation.selection.selectable
 import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.Card
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
+import androidx.compose.material3.OutlinedTextField
 import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Slider
@@ -43,6 +47,9 @@ import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.core.settings.BatteryOptimization
 import com.nos.motobitride.core.settings.StartupBehavior
+import com.nos.motobitride.ui.i18n.AppLanguage
+import com.nos.motobitride.ui.i18n.AppTexts
+import com.nos.motobitride.ui.i18n.AppThemeMode
 import kotlinx.coroutines.delay
 import kotlin.math.roundToInt
 
@@ -55,14 +62,14 @@ fun SettingsScreen(
     onOpenDiagnostics: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
+    val currentLang by AppSettings.language.collectAsState()
+    val currentThemeMode by AppSettings.themeMode.collectAsState()
     val startup by AppSettings.startup.collectAsState()
     val savedHud by SavedHud.current.collectAsState()
     val idleMinutes by AppSettings.encoderIdleMinutes.collectAsState()
     val clockPushCount by AppSettings.clockPushCount.collectAsState()
     val diagLogEnabled by AppSettings.diagLogEnabled.collectAsState()
 
-    // Stato dell'esenzione batteria, riletto periodicamente: al ritorno dal
-    // dialog di sistema la schermata non riceve altre notifiche.
     var batteryExempt by remember { mutableStateOf(BatteryOptimization.isIgnoring(ctx)) }
     LaunchedEffect(Unit) {
         while (true) {
@@ -80,9 +87,11 @@ fun SettingsScreen(
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { Text("Impostazioni") },
+                title = { Text(AppTexts.get("settings_title", currentLang)) },
                 actions = {
-                    TextButton(onClick = onBack) { Text("Indietro") }
+                    TextButton(onClick = onBack) {
+                        Text(AppTexts.get("common_back", currentLang))
+                    }
                 }
             )
         }
@@ -95,12 +104,91 @@ fun SettingsScreen(
                 .verticalScroll(rememberScrollState()),
             verticalArrangement = Arrangement.spacedBy(12.dp)
         ) {
+            // Sezione Lingua App (Menu a tendina / Dropdown)
             HorizontalDivider()
-            Text("Avvio", style = MaterialTheme.typography.titleMedium)
+            Text(AppTexts.get("settings_language_title", currentLang), style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Cosa fa l'app quando la apri e c'e' un HUD gia' memorizzato.",
+                text = AppTexts.get("settings_language_desc", currentLang),
                 style = MaterialTheme.typography.bodySmall
             )
+
+            var langExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = langExpanded,
+                onExpandedChange = { langExpanded = !langExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = currentLang.labelWithFlag,
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(AppTexts.get("settings_language_title", currentLang)) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = langExpanded) },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = langExpanded,
+                    onDismissRequest = { langExpanded = false }
+                ) {
+                    AppLanguage.entries.forEach { lang ->
+                        DropdownMenuItem(
+                            text = { Text(lang.labelWithFlag, style = MaterialTheme.typography.bodyLarge) },
+                            onClick = {
+                                AppSettings.setLanguage(lang)
+                                langExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Sezione Tema Grafico (Menu a tendina / Dropdown)
+            HorizontalDivider()
+            Text(AppTexts.get("settings_theme_title", currentLang), style = MaterialTheme.typography.titleMedium)
+            Text(
+                text = AppTexts.get("settings_theme_desc", currentLang),
+                style = MaterialTheme.typography.bodySmall
+            )
+
+            var themeExpanded by remember { mutableStateOf(false) }
+            ExposedDropdownMenuBox(
+                expanded = themeExpanded,
+                onExpandedChange = { themeExpanded = !themeExpanded },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                OutlinedTextField(
+                    value = AppTexts.get(currentThemeMode.labelKey, currentLang),
+                    onValueChange = {},
+                    readOnly = true,
+                    label = { Text(AppTexts.get("settings_theme_title", currentLang)) },
+                    trailingIcon = { ExposedDropdownMenuDefaults.TrailingIcon(expanded = themeExpanded) },
+                    colors = ExposedDropdownMenuDefaults.outlinedTextFieldColors(),
+                    modifier = Modifier
+                        .menuAnchor()
+                        .fillMaxWidth()
+                )
+                ExposedDropdownMenu(
+                    expanded = themeExpanded,
+                    onDismissRequest = { themeExpanded = false }
+                ) {
+                    AppThemeMode.entries.forEach { mode ->
+                        DropdownMenuItem(
+                            text = { Text(AppTexts.get(mode.labelKey, currentLang), style = MaterialTheme.typography.bodyLarge) },
+                            onClick = {
+                                AppSettings.setThemeMode(mode)
+                                themeExpanded = false
+                            }
+                        )
+                    }
+                }
+            }
+
+            // Sezione Avvio
+            HorizontalDivider()
+            Text(AppTexts.get("settings_startup_title", currentLang), style = MaterialTheme.typography.titleMedium)
 
             Column(Modifier.selectableGroup()) {
                 StartupBehavior.entries.forEach { option ->
@@ -120,9 +208,9 @@ fun SettingsScreen(
                             onClick = null
                         )
                         Column(Modifier.padding(start = 12.dp)) {
-                            Text(option.label, style = MaterialTheme.typography.bodyLarge)
+                            Text(AppTexts.get(option.labelKey, currentLang), style = MaterialTheme.typography.bodyLarge)
                             Text(
-                                option.description,
+                                AppTexts.get("${option.labelKey}_desc", currentLang),
                                 style = MaterialTheme.typography.bodySmall
                             )
                         }
@@ -130,57 +218,11 @@ fun SettingsScreen(
                 }
             }
 
+            // Sezione Risparmio durante l'attesa
             HorizontalDivider()
-            Text("Batteria", style = MaterialTheme.typography.titleMedium)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(vertical = 4.dp),
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Column(Modifier.weight(1f)) {
-                    Text(
-                        text = "Escludi dal risparmio energetico",
-                        style = MaterialTheme.typography.bodyLarge
-                    )
-                    Text(
-                        text = if (batteryExempt) {
-                            "Attiva: Android non termina il servizio di cattura."
-                        } else {
-                            "Disattiva: Doze puo' interrompere la trasmissione e " +
-                                    "richiedere un nuovo consenso alla cattura."
-                        },
-                        style = MaterialTheme.typography.bodySmall
-                    )
-                }
-                Switch(
-                    checked = batteryExempt,
-                    onCheckedChange = { enable ->
-                        AppLog.i(TAG, "Esclusione batteria -> $enable")
-                        val intent = try {
-                            if (enable) {
-                                BatteryOptimization.requestIgnoreIntent(ctx)
-                            } else {
-                                BatteryOptimization.listSettingsIntent()
-                            }
-                        } catch (t: Throwable) {
-                            AppLog.e(TAG, "Intent batteria non disponibile", t)
-                            null
-                        }
-                        if (intent != null) {
-                            runCatching { batteryLauncher.launch(intent) }
-                        }
-                    }
-                )
-            }
-
-            HorizontalDivider()
-            Text("Risparmio durante l'attesa", style = MaterialTheme.typography.titleMedium)
+            Text(AppTexts.get("settings_encoder_idle_title", currentLang), style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Se l'HUD sparisce (TFT spento, sosta), la trasmissione viene " +
-                        "sospesa dopo questo tempo per non consumare batteria. La " +
-                        "connessione continua a essere ritentata e il video riprende da " +
-                        "solo al ritorno dell'HUD, senza nuovi consensi.",
+                text = AppTexts.get("settings_encoder_idle_desc", currentLang),
                 style = MaterialTheme.typography.bodySmall
             )
 
@@ -188,11 +230,7 @@ fun SettingsScreen(
                 mutableStateOf(idleMinutes.toFloat())
             }
             Text(
-                text = if (sliderValue.roundToInt() == 0) {
-                    "Sospensione: mai"
-                } else {
-                    "Sospensione dopo ${sliderValue.roundToInt()} min"
-                },
+                text = AppTexts.get("settings_encoder_idle_label", currentLang, sliderValue.roundToInt()),
                 style = MaterialTheme.typography.bodyLarge
             )
             Slider(
@@ -208,28 +246,19 @@ fun SettingsScreen(
                 modifier = Modifier.fillMaxWidth()
             )
 
+            // Sezione Orologio (Slider da 3 a 60, default 3)
             HorizontalDivider()
-            Text("Sincronizzazione orologio TFT", style = MaterialTheme.typography.titleMedium)
+            Text(AppTexts.get("settings_clock_sync_title", currentLang), style = MaterialTheme.typography.titleMedium)
             Text(
-                text = "Il TFT imposta l'orario solo ricevendo una raffica di " +
-                        "pacchetti ora all'apertura della connessione (uno ogni 250 ms). " +
-                        "Troppi pacchetti intasano la connessione, troppo pochi lasciano " +
-                        "l'orario a 00.MM. Questo valore e' il numero di pacchetti " +
-                        "inviati: usalo per trovare il minimo che imposta l'ora " +
-                        "(es. prova 20, poi 30, poi 40...).",
+                text = AppTexts.get("settings_clock_sync_desc", currentLang),
                 style = MaterialTheme.typography.bodySmall
             )
             var pushValue by remember(clockPushCount) {
                 mutableStateOf(clockPushCount.toFloat())
             }
             val currentPushInt = pushValue.roundToInt()
-            val pushLabel = if (currentPushInt == 1) {
-                "Push orologio: 1 (sincronizzato al primo frame)"
-            } else {
-                "Push orologio: $currentPushInt pacchetti (raffica handshake)"
-            }
             Text(
-                text = pushLabel,
+                text = AppTexts.get("settings_clock_sync_label", currentLang, currentPushInt),
                 style = MaterialTheme.typography.bodyLarge
             )
             Slider(
@@ -240,12 +269,13 @@ fun SettingsScreen(
                 },
                 valueRange = AppSettings.MIN_CLOCK_PUSH_COUNT.toFloat()..
                         AppSettings.MAX_CLOCK_PUSH_COUNT.toFloat(),
-                steps = 59,
+                steps = AppSettings.MAX_CLOCK_PUSH_COUNT - AppSettings.MIN_CLOCK_PUSH_COUNT - 1,
                 modifier = Modifier.fillMaxWidth()
             )
 
+            // Sezione Diagnostica
             HorizontalDivider()
-            Text("Diagnostica", style = MaterialTheme.typography.titleMedium)
+            Text(AppTexts.get("settings_diagnostics_entry", currentLang), style = MaterialTheme.typography.titleMedium)
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -255,11 +285,11 @@ fun SettingsScreen(
             ) {
                 Column(Modifier.weight(1f)) {
                     Text(
-                        text = "Log e diagnostica",
+                        text = AppTexts.get("settings_diagnostics_entry", currentLang),
                         style = MaterialTheme.typography.bodyLarge
                     )
                     Text(
-                        text = "Apre la finestra del log con l'interruttore.",
+                        text = AppTexts.get("settings_diagnostics_entry_desc", currentLang),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -269,14 +299,15 @@ fun SettingsScreen(
                     style = MaterialTheme.typography.labelLarge
                 )
                 Text(
-                    text = "\u25B8",
+                    text = " \u25B8",
                     color = MaterialTheme.colorScheme.onSurface.copy(alpha = 0.5f),
                     style = MaterialTheme.typography.titleLarge
                 )
             }
 
+            // Sezione HUD Memorizzato
             HorizontalDivider()
-            Text("HUD memorizzato", style = MaterialTheme.typography.titleMedium)
+            Text(AppTexts.get("hud_saved_card", currentLang), style = MaterialTheme.typography.titleMedium)
 
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
@@ -288,7 +319,7 @@ fun SettingsScreen(
                     val hud = savedHud
                     if (hud == null) {
                         Text(
-                            "Nessun HUD memorizzato: scansiona il QR.",
+                            AppTexts.get("hud_no_saved", currentLang),
                             style = MaterialTheme.typography.bodyMedium
                         )
                     } else {
@@ -315,20 +346,18 @@ fun SettingsScreen(
                         enabled = savedHud != null,
                         modifier = Modifier.padding(top = 8.dp)
                     ) {
-                        Text("Dimentica HUD")
+                        Text(AppTexts.get("common_clear", currentLang))
                     }
                 }
             }
-
-            HorizontalDivider()
-            Text("Note", style = MaterialTheme.typography.titleMedium)
-            Text(
-                text = "Il consenso alla cattura schermo non e' memorizzabile: e' una " +
-                        "misura di sicurezza di Android e va riconfermato a ogni avvio " +
-                        "dell'app. Non serve invece riconfermarlo quando cade e torna " +
-                        "il link verso l'HUD, finche' l'app resta in esecuzione.",
-                style = MaterialTheme.typography.bodySmall
-            )
         }
+    }
+}
+
+@androidx.compose.ui.tooling.preview.Preview(showBackground = true)
+@Composable
+fun SettingsScreenPreview() {
+    com.nos.motobitride.ui.theme.MotobitRideTheme {
+        SettingsScreen()
     }
 }

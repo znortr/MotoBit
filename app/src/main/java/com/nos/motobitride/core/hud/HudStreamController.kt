@@ -768,8 +768,12 @@ class HudStreamController(
             val tzOffsetSec = tz.getOffset(System.currentTimeMillis()) / 1000L
             session.setClockTimeZone(tz.id, tzOffsetSec)
             // Numero di push della raffica orologio scelto nelle Impostazioni
-            // (bisezione 10..60, default 60 = noto-good 1.0.18).
+            // (bisezione 3..60, default 3).
             session.setClockPushCount(AppSettings.clockPushCount.value.toLong())
+            // Push dell'ora NON richiesto ogni 5 min: default OFF. Misurato che
+            // intasa la socket di controllo PXC (:54612): resta in coda TCP non
+            // confermata e blocca gli ACK 0x10631 verso il TFT.
+            session.setPeriodicClockKeepalive(AppSettings.periodicClockKeepalive.value)
 
             session.startSession()
 
@@ -1282,10 +1286,6 @@ class HudStreamController(
         // MediaCtrlChk = l'HU inizia a consumare il video: chiediamo subito un IDR
         if (source == EVENT_SOURCE_MEDIA_CONTROL && command == MEDIA_CTRL_CHK) {
             encoder?.requestSyncFrame()
-            if (AppSettings.clockPushCount.value == 1) {
-                AppLog.i(TAG, "Invio 1 singolo pacchetto orologio al primo frame video (VideoStart)")
-                mobileSession?.sendSingleClockPush()
-            }
         }
 
         if (isRunning && mediaProjection != null && virtualDisplay == null) {
