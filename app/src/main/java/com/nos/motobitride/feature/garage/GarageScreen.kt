@@ -44,10 +44,12 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import com.nos.motobitride.core.garage.DeadlineKind
+import com.nos.motobitride.core.garage.DeadlineNotifications
 import com.nos.motobitride.core.garage.DeadlineReminder
 import com.nos.motobitride.core.garage.VehicleDeadline
 import com.nos.motobitride.core.garage.VehicleStore
@@ -84,6 +86,7 @@ fun GarageScreen(
     onNavigateSettings: () -> Unit = {},
     onScanQr: () -> Unit = {}
 ) {
+    val ctx = LocalContext.current
     val currentLang by AppSettings.language.collectAsState()
     val savedHud by SavedHud.current.collectAsState()
     val profile by VehicleStore.current.collectAsState()
@@ -91,6 +94,7 @@ fun GarageScreen(
     var showEdit by remember { mutableStateOf(false) }
     var showDeadlines by remember { mutableStateOf(false) }
     var showInfo by remember { mutableStateOf(false) }
+    var showForgetConfirm by remember { mutableStateOf(false) }
 
     LaunchedEffect(hudQrValue) {
         if (hudQrValue is QrContent.HudWifi) SavedHud.save(hudQrValue)
@@ -188,7 +192,7 @@ fun GarageScreen(
                     // ---------------- In fondo: Dimentica / Scansiona QR -------
                     if (savedHud != null) {
                         OutlinedButton(
-                            onClick = { SavedHud.clear() },
+                            onClick = { showForgetConfirm = true },
                             modifier = Modifier.fillMaxWidth()
                         ) {
                             Text(AppTexts.get("garage_forget", currentLang))
@@ -236,6 +240,47 @@ fun GarageScreen(
             onDismiss = { showInfo = false }
         )
     }
+
+    if (showForgetConfirm) {
+        ForgetVehicleDialog(
+            lang = currentLang,
+            onDismiss = { showForgetConfirm = false },
+            onConfirm = {
+                // Cancella TUTTO: connessione, nome, targa, scadenze e avvisi.
+                SavedHud.clear()
+                VehicleStore.clear()
+                DeadlineKind.entries.forEach { DeadlineNotifications.cancel(ctx, it) }
+                showForgetConfirm = false
+            }
+        )
+    }
+}
+
+// ---------------------------------------------------------------------------
+// Dialog: conferma "Dimentica"
+// ---------------------------------------------------------------------------
+
+@Composable
+private fun ForgetVehicleDialog(
+    lang: AppLanguage,
+    onDismiss: () -> Unit,
+    onConfirm: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        title = { Text(AppTexts.get("garage_forget_confirm_title", lang)) },
+        text = { Text(AppTexts.get("garage_forget_confirm_text", lang)) },
+        confirmButton = {
+            TextButton(onClick = onConfirm) {
+                Text(AppTexts.get("garage_forget", lang))
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text(AppTexts.get("common_cancel", lang))
+            }
+        }
+    )
 }
 
 // ---------------------------------------------------------------------------

@@ -366,8 +366,12 @@ fun HudScreen(
                 OutlinedButton(
                     onClick = {
                         AppLog.i(TAG_UI, "Chiudi premuto")
-                        HudSession.closeAll()
+                        // Prima si ferma il servizio (rimuove la notifica e chiude
+                        // la MediaProjection), poi sessione e link: cosi'
+                        // `closeAll()` non prova ad aggiornare una notifica che
+                        // non esiste piu'.
                         ScreenCaptureService.stopService(ctx)
+                        HudSession.closeAll()
                         ctx.getActivity()?.finishAndRemoveTask()
                     }
                 ) {

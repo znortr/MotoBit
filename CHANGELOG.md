@@ -4,6 +4,37 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.0.3 — Notifica persistente su "Chiudi" e "Dimentica" corretto
+
+**Data**: 2026-11-07 · **versionCode**: 2003
+
+Solo UI/servizio. Connessione/trasmissione/stabilità invariate (2.0.0).
+
+### Bug 1 — la notifica restava dopo "Chiudi"
+**Sequenza che la ricreava**:
+```
+Chiudi → HudSession.closeAll() → updateStatus("Fermo") → notify()
+       → ScreenCaptureService.stopService() → notifica rimossa
+       → finishAndRemoveTask() → onTaskRemoved()
+       → HudSession.closeAll() → updateStatus("Fermo") → notify()  ← RICREATA
+```
+`updateStatus()` non sapeva che il servizio era già morto e ripostava la
+notifica, che restava per sempre.
+
+**Fix**:
+- flag `running` in `ScreenCaptureService`: `updateStatus()` esce subito se il
+  servizio non è in primo piano;
+- `onDestroy()` e `stopService()` annullano esplicitamente la notifica;
+- in `HudScreen` l'ordine è cambiato: **prima** `stopService`, **poi** `closeAll()`.
+
+### Bug 2 — "Dimentica" nel Garage
+| | Prima | Ora |
+|---|---|---|
+| Conferma | ❌ cancellava al primo tocco | ✅ **dialog "Dimenticare il veicolo?"** con Annulla/Dimentica |
+| Cosa cancella | solo i dati di connessione (`SavedHud`) | ✅ **tutto**: connessione + nome + targa + scadenze (`VehicleStore.clear()`) + notifiche di scadenza annullate |
+
+---
+
 ## 🎨 2.0.2 — Scansione QR: intestazione come le altre pagine
 
 **Data**: 2026-11-07 · **versionCode**: 2002

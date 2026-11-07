@@ -14,6 +14,7 @@ import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.os.IBinder
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import com.nos.motobitride.R
 import com.nos.motobitride.core.log.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -65,6 +66,9 @@ class ScreenCaptureService : Service() {
             startForeground(NOTIFICATION_ID, buildNotification(this, currentText))
         }
 
+        // Da qui il servizio e' vivo: `updateStatus` puo' aggiornare la notifica.
+        running = true
+
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
             ?: Activity.RESULT_CANCELED
 
@@ -113,6 +117,11 @@ class ScreenCaptureService : Service() {
 
     override fun onDestroy() {
         super.onDestroy()
+        running = false
+        // Sicurezza: nessuna notifica deve sopravvivere al servizio.
+        runCatching {
+            NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID)
+        }
         AppLog.i(TAG, "ScreenCaptureService distrutto")
         _mediaProjectionState.value?.let {
             try {
@@ -146,6 +155,17 @@ class ScreenCaptureService : Service() {
         @Volatile
         private var currentText: String = "Invio dello schermo all'HUD..."
 
+        /**
+         * Vero solo mentre il servizio e' in foreground.
+         *
+         * Senza questa guardia `updateStatus()` poteva **ricreare** la notifica
+         * dopo che il servizio era stato fermato: `finishAndRemoveTask()` chiama
+         * `onTaskRemoved()` -> `HudSession.closeAll()` -> `updateStatus("Fermo")`
+         * -> `notify()`, e la notifica riappariva ad app chiusa.
+         */
+        @Volatile
+        private var running = false
+
         private val _mediaProjectionState = MutableStateFlow<MediaProjection?>(null)
         val mediaProjectionFlow: StateFlow<MediaProjection?> =
             _mediaProjectionState.asStateFlow()
@@ -163,6 +183,11 @@ class ScreenCaptureService : Service() {
         }
 
         fun stopService(context: Context) {
+            // La notifica va rimossa SUBITO: se il servizio non fosse in primo
+            // piano, `stopService` non la toccherebbe.
+            runCatching {
+                NotificationManagerCompat.from(context).cancel(NOTIFICATION_ID)
+            }
             try {
                 context.stopService(Intent(context, ScreenCaptureService::class.java))
             } catch (t: Throwable) {
@@ -176,6 +201,7 @@ class ScreenCaptureService : Service() {
          * Non fa nulla se il testo non e' cambiato (evita notify inutili).
          */
         fun updateStatus(context: Context, text: String) {
+            if (!running) return // servizio morto: nessuna notifica da aggiornare
             if (text == currentText) return
             currentText = text
             val nm = context.getSystemService(NotificationManager::class.java) ?: return
