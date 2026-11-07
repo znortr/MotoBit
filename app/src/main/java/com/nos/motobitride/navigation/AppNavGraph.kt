@@ -92,8 +92,18 @@ fun AppNavGraph(
                     }
                 },
                 onBack = {
+                    // "Chiudi" riporta sempre alla HOME, non alla pagina da cui
+                    // si era aperta la scansione (es. Garage).
                     if (navController.currentDestination?.route == AppDestination.QrScan.route) {
-                        navController.popBackStack()
+                        val popped = navController.popBackStack(
+                            AppDestination.Hud.route,
+                            inclusive = false
+                        )
+                        if (!popped) {
+                            navController.navigate(AppDestination.Hud.route) {
+                                launchSingleTop = true
+                            }
+                        }
                     }
                 }
             )

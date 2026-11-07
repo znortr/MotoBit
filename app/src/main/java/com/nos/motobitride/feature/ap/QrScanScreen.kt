@@ -11,6 +11,7 @@ import androidx.camera.lifecycle.ProcessCameraProvider
 import androidx.camera.view.PreviewView
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -24,10 +25,12 @@ import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
+import androidx.compose.material3.ExperimentalMaterial3Api
 import androidx.compose.material3.Icon
-import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -37,7 +40,6 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
@@ -58,12 +60,15 @@ import com.nos.motobitride.ui.i18n.AppTexts
 /**
  * Scansione del QR sul TFT.
  *
- * UI a schermo pieno con la fotocamera:
- *  - in alto solo il logo MotoBit **centrato** e la X per chiudere;
- *  - al centro una cornice che indica dove inquadrare il QR;
- *  - subito sotto la cornice un riquadro semitrasparente con le istruzioni
- *    nella lingua scelta.
+ * L'intestazione è **la stessa delle altre pagine** (logo MotoBit a sinistra,
+ * con la versione, su sfondo pieno — niente trasparenza): al posto delle tre
+ * icone di navigazione c'è il pulsante **Chiudi** (X + testo), che riporta alla
+ * Home.
+ *
+ * Sotto: fotocamera a schermo pieno, cornice di puntamento e riquadro
+ * semitrasparente con le istruzioni nella lingua scelta.
  */
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun QrScanScreen(
     onQrScanned: (QrContent) -> Unit = {},
@@ -93,105 +98,100 @@ fun QrScanScreen(
         }
     }
 
-    Box(
-        modifier = Modifier
-            .fillMaxSize()
-            .background(Color.Black)
-    ) {
-        // ---------------- Fotocamera a schermo pieno ----------------
-        if (hasCameraPermission) {
-            QrCameraPreview(
-                onBarcodeScanned = { qrContent ->
-                    if (hasHandledResult) return@QrCameraPreview
-                    hasHandledResult = true
-                    onQrScanned(qrContent)
+    Scaffold(
+        topBar = {
+            TopAppBar(
+                title = { MotobitLogo(showVersion = true) },
+                actions = {
+                    // Al posto delle tre icone: X + "Chiudi" → torna alla Home
+                    Row(
+                        modifier = Modifier
+                            .clickable(onClick = onBack)
+                            .padding(horizontal = 12.dp, vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Icon(
+                            imageVector = Icons.Default.Close,
+                            contentDescription = null,
+                            tint = MaterialTheme.colorScheme.primary
+                        )
+                        Spacer(Modifier.width(4.dp))
+                        Text(
+                            text = AppTexts.get("common_close", currentLang),
+                            style = MaterialTheme.typography.labelLarge,
+                            color = MaterialTheme.colorScheme.primary
+                        )
+                    }
                 }
             )
         }
-
-        // ---------------- Sfumatura in alto per leggibilità ----------------
+    ) { innerPadding ->
         Box(
             modifier = Modifier
-                .fillMaxWidth()
-                .height(96.dp)
-                .align(Alignment.TopCenter)
-                .background(
-                    Brush.verticalGradient(
-                        listOf(Color.Black.copy(alpha = 0.65f), Color.Transparent)
-                    )
-                )
-        )
-
-        // ---------------- Barra: logo centrato + X a destra ----------------
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .align(Alignment.TopCenter)
-                .padding(horizontal = 4.dp, vertical = 4.dp),
-            verticalAlignment = Alignment.CenterVertically
+                .padding(innerPadding)
+                .fillMaxSize()
+                .background(Color.Black)
         ) {
-            // Spazio di pari larghezza del bottone X: tiene il logo davvero al centro
-            Spacer(Modifier.width(48.dp))
-            Box(Modifier.weight(1f), contentAlignment = Alignment.Center) {
-                MotobitLogo(baseColor = Color.White)
-            }
-            IconButton(onClick = onBack) {
-                Icon(
-                    imageVector = Icons.Default.Close,
-                    contentDescription = AppTexts.get("common_close", currentLang),
-                    tint = Color.White
+            // ---------------- Fotocamera a schermo pieno ----------------
+            if (hasCameraPermission) {
+                QrCameraPreview(
+                    onBarcodeScanned = { qrContent ->
+                        if (hasHandledResult) return@QrCameraPreview
+                        hasHandledResult = true
+                        onQrScanned(qrContent)
+                    }
                 )
             }
-        }
 
-        // ---------------- Cornice di puntamento + istruzioni ----------------
-        Column(
-            modifier = Modifier
-                .align(Alignment.Center)
-                .fillMaxWidth(),
-            horizontalAlignment = Alignment.CenterHorizontally
-        ) {
-            Box(
+            // ---------------- Cornice di puntamento + istruzioni ----------------
+            Column(
                 modifier = Modifier
-                    .size(260.dp)
-                    .border(3.dp, Color.White, RoundedCornerShape(24.dp))
-            )
-
-            Spacer(Modifier.height(20.dp))
-
-            // Riquadro semitrasparente subito sotto la cornice
-            Box(
-                modifier = Modifier
-                    .fillMaxWidth(0.88f)
-                    .background(
-                        Color.Black.copy(alpha = 0.55f),
-                        RoundedCornerShape(16.dp)
-                    )
-                    .padding(horizontal = 16.dp, vertical = 14.dp)
+                    .align(Alignment.Center)
+                    .fillMaxWidth(),
+                horizontalAlignment = Alignment.CenterHorizontally
             ) {
-                Column(horizontalAlignment = Alignment.CenterHorizontally) {
-                    if (!hasCameraPermission) {
-                        Text(
-                            text = AppTexts.get("qr_scan_permission", currentLang),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
+                Box(
+                    modifier = Modifier
+                        .size(260.dp)
+                        .border(3.dp, Color.White, RoundedCornerShape(24.dp))
+                )
+
+                Spacer(Modifier.height(20.dp))
+
+                // Riquadro semitrasparente subito sotto la cornice
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth(0.88f)
+                        .background(
+                            Color.Black.copy(alpha = 0.55f),
+                            RoundedCornerShape(16.dp)
                         )
-                    } else {
-                        Text(
-                            text = AppTexts.get("qr_scan_title", currentLang),
-                            style = MaterialTheme.typography.titleMedium,
-                            fontWeight = FontWeight.Bold,
-                            color = Color.White,
-                            textAlign = TextAlign.Center
-                        )
-                        Spacer(Modifier.height(6.dp))
-                        Text(
-                            text = AppTexts.get("qr_scan_instruction", currentLang),
-                            style = MaterialTheme.typography.bodyMedium,
-                            color = Color.White.copy(alpha = 0.9f),
-                            textAlign = TextAlign.Center
-                        )
+                        .padding(horizontal = 16.dp, vertical = 14.dp)
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        if (!hasCameraPermission) {
+                            Text(
+                                text = AppTexts.get("qr_scan_permission", currentLang),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                        } else {
+                            Text(
+                                text = AppTexts.get("qr_scan_title", currentLang),
+                                style = MaterialTheme.typography.titleMedium,
+                                fontWeight = FontWeight.Bold,
+                                color = Color.White,
+                                textAlign = TextAlign.Center
+                            )
+                            Spacer(Modifier.height(6.dp))
+                            Text(
+                                text = AppTexts.get("qr_scan_instruction", currentLang),
+                                style = MaterialTheme.typography.bodyMedium,
+                                color = Color.White.copy(alpha = 0.9f),
+                                textAlign = TextAlign.Center
+                            )
+                        }
                     }
                 }
             }

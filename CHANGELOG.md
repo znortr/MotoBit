@@ -4,6 +4,24 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.0.2 — Scansione QR: intestazione come le altre pagine
+
+**Data**: 2026-11-07 · **versionCode**: 2002
+
+Solo UI. Connessione/trasmissione/stabilità invariate (congelate in 2.0.0).
+
+- L'intestazione della pagina QR è ora una `TopAppBar` **identica alle altre pagine**:
+  logo **MotoBit a sinistra** con la versione, su **sfondo pieno** (non più
+  trasparente sopra la fotocamera).
+- Al posto delle tre icone di navigazione: pulsante **X + "Chiudi"**.
+- Il tocco su **Chiudi riporta alla Home** (`popBackStack` fino a `hud`, non più
+  un semplice "indietro" che tornava al Garage).
+- Rimossa la sfumatura in alto, non più necessaria con la barra opaca.
+- Invariati: fotocamera a schermo pieno, cornice di puntamento, riquadro
+  semitrasparente con le istruzioni tradotte.
+
+---
+
 ## 🎨 2.0.1 — Garage e scansione QR ridisegnati
 
 **Data**: 2026-11-07 · **versionCode**: 2001
