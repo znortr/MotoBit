@@ -4,6 +4,54 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🏁 2.0.0 — VERSIONE CANDIDATA DEFINITIVA (connessione / trasmissione / stabilità)
+
+**Data**: 2026-11-07 · **versionCode**: 2000 · **Backup**: `dev_backup\Motobit_alfa_V2.0.0.zip`
+
+> ### 📌 Da questa versione il lato **connessione, trasmissione e stabilità è CONGELATO**
+>
+> Test di stabilità **superato**: 1 ora di streaming continuo, zero riconnessioni,
+> zero errori, `retrans=0` su tutte le socket. Le versioni successive riguarderanno
+> **solo prodotto/UI** (Garage, scadenze, schermo acceso, oscuramento, permessi),
+> salvo richiesta esplicita dell'utente di toccare la connessione.
+
+### Cosa contiene rispetto alla 1.1.5 (base di partenza)
+
+| Area | Intervento |
+|---|---|
+| **Riconnessione in background** | `ScreenCaptureService` con `foregroundServiceType="mediaProjection\|location"`: senza il tipo `location` Android 10+ rifiuta `discoverPeers`/`connect` in background |
+| **Sessione a vita di processo** | `HudSession` possiede link + streaming: la UI non li distrugge più in `onDispose` |
+| **Recupero P2P passivo** | niente più `removeGroup`/`initialize` a ogni retry: canale riusato, `connect` solo al ritorno del peer |
+| **Riconnessione immediata** | `onLinkRestored()`: azzera il backoff al ritorno del link (era fino a 10 s di attesa) |
+| **Guardia anti-doppio-handshake** | flag `connecting` auto-riparante (90 s): elimina le due sessioni concorrenti che rendevano l'immagine intermittente |
+| **Cadenza encoder** | `paceLoop` senza recupero: eliminati i picchi 43-51 fps |
+| **Notifica viva** | stato reale + azioni `Stop` / `Riconnetti`; si chiude con l'app (`onTaskRemoved`) |
+| **Attesa attiva → passiva** | dopo N minuti senza TFT si smette di tentare ma il receiver resta in ascolto |
+| **Revoca MediaProjection** | messaggio esplicito in Home e notifica |
+
+### Test superati
+- 1 ora di streaming continuo: **zero** riconnessioni, **zero** errori, `retrans=0`
+- Spegnimento/riaccensione TFT: riconnessione automatica anche con app in background
+- Swipe dal registro app: sessione chiusa e notifica rimossa
+- `Stop` / `Riconnetti` dalla notifica
+- Doppio tocco su "Avvia" dopo un "Chiudi": risolto (era un flag di processo)
+
+### Cosa è stato verificato **non** essere una regressione
+`HudEncoder.kt` e la pipeline di cattura/encoding sono **identici alla 1.1.5**
+(confronto diretto con il backup `Motobit_alfa_V1.1.5.zip`).
+
+### Limite noto e accettato
+Consegna frame ~**14-16 fps** su ~26-29 richieste del TFT (46% di risposte `idle`).
+Il TFT tiene l'ultimo frame → fermo immagine di 40-70 ms: **impercettibile con le
+mappe** (uso reale), visibile solo con video. Due strade annotate nel `TODO.md` §10.
+
+### Funzioni di prodotto incluse
+Garage a card (nome editabile, targa, revisione/tassa/assicurazione con mese+giorno,
+conto alla rovescia), promemoria con notifiche `WorkManager` (Posponi/Elimina),
+Impostazioni in 5 categorie con sottopagine, icona adattiva unica.
+
+---
+
 ## 🚀 1.3.6 — La notifica si chiude quando si chiude l'app
 
 **Data**: 2026-11-07 · **versionCode**: 1306
