@@ -13,7 +13,7 @@ object AppTexts {
         "common_name" to "Nome",
 
         // Theme
-        "theme_dark" to "🌙 Scuro (Default)",
+        "theme_dark" to "🌙 Scuro",
         "theme_light" to "☀️ Chiaro",
         "theme_system" to "📱 Sistema",
 
@@ -30,10 +30,23 @@ object AppTexts {
 
         // Settings Screen
         "settings_title" to "Impostazioni",
+        "settings_menu_title" to "Impostazioni",
+        "settings_menu_sub" to "Configura l'app, la connessione e i permessi",
+        "settings_cat_general_title" to "Generale",
+        "settings_cat_general_sub" to "Lingua e tema dell'applicazione",
+        "settings_cat_connections_title" to "Connessioni",
+        "settings_cat_connections_sub" to "Modalita' di connessione e riconnessione",
+        "settings_cat_resolution_title" to "Risoluzione",
+        "settings_cat_resolution_sub" to "Dimensioni dello schermo inviato al TFT",
+        "settings_cat_permissions_title" to "Permessi",
+        "settings_cat_permissions_sub" to "Concessione dei permessi necessari",
+        "settings_cat_development_title" to "Opzioni Sviluppo",
+        "settings_cat_development_sub" to "Diagnostica e settaggi sperimentali",
         "settings_language_title" to "Lingua App",
-        "settings_language_desc" to "Seleziona la lingua dell'interfaccia (Italiano / English)",
+        "settings_language_desc" to "Seleziona la lingua dell'interfaccia.",
         "settings_theme_title" to "Tema Grafico",
-        "settings_theme_desc" to "Seleziona l'aspetto dell'applicazione (Default: Scuro)",
+        "settings_theme_desc" to "Seleziona l'aspetto dell'applicazione.",
+        "settings_vibrate_toast" to "Vibrazione attivata",
         "settings_startup_title" to "Comportamento all'avvio",
         "settings_startup_manual" to "Solo credenziali salvate",
         "settings_startup_manual_desc" to "Mostra il nome dell'HUD salvato. Link e video partono solo premendo Avvia.",
@@ -41,14 +54,41 @@ object AppTexts {
         "settings_startup_autolink_desc" to "Ricostruisce il Wi-Fi Direct in automatico e mostra il nome. Il video parte solo premendo Avvia.",
         "settings_startup_autolink_stream" to "Collega e trasmetti",
         "settings_startup_autolink_stream_desc" to "Ricostruisce il link e avvia anche il video. Android chiede comunque il consenso alla cattura schermo.",
-        "settings_encoder_idle_title" to "Sospensione encoder H.264",
-        "settings_encoder_idle_desc" to "Sospende la codifica video dopo N minuti di attesa per risparmiare batteria e calore.",
-        "settings_encoder_idle_label" to "Sospendi encoder dopo: %d min (0 = mai)",
+        "settings_encoder_idle_title" to "Attesa attiva della riconnessione",
+        "settings_encoder_idle_desc" to "Per quanti minuti l'app tenta attivamente di riconnettersi al TFT. Oltre la soglia passa in ascolto passivo: nessun tentativo, ma la riconnessione resta automatica appena il TFT torna.",
+        "settings_active_wait_label" to "Attesa attiva: %d min",
+        "settings_vibrate_title" to "Vibrazione su connessione",
+        "settings_vibrate_desc" to "Breve vibrazione quando il link con il TFT si connette o si perde. Utile con il telefono in tasca.",
+
+        // Cause del link (messaggi per l'utente)
+        "link_cause_p2p_off" to "Wi-Fi Direct disattivato: attivalo nelle impostazioni di sistema.",
+        "link_cause_busy" to "L'HUD potrebbe essere connesso a un altro telefono.",
+        "link_cause_no_peer" to "TFT non trovato: controlla che sia acceso e vicino.",
+        "link_cause_passive" to "In attesa passiva del TFT (riprende da solo alla riaccensione).",
         "settings_clock_sync_title" to "Sincronizzazione orologio TFT",
         "settings_clock_sync_desc" to "Il TFT imposta l'orario solo ricevendo una raffica di pacchetti ora all'apertura della connessione (uno ogni 250 ms). Questo valore e' il numero di pacchetti inviati (minimo 3).",
         "settings_clock_sync_label" to "Push orologio: %d pacchetti (raffica handshake)",
         "settings_diagnostics_entry" to "Log e diagnostica",
         "settings_diagnostics_entry_desc" to "Visualizza eventi in tempo reale e configura il salvataggio log su file.",
+
+        // Permessi e affidabilita'
+        "perm_section_title" to "Permessi e affidabilita'",
+        "perm_section_desc" to "Servono per far funzionare il link Wi-Fi Direct e la riconnessione automatica anche con l'app in background.",
+        "perm_all_ok" to "Tutto a posto: la riconnessione automatica funziona anche in background.",
+        "perm_location_title" to "Posizione precisa",
+        "perm_location_desc" to "Obbligatoria: Android la richiede per le API Wi-Fi Direct.",
+        "perm_gps_title" to "Posizione di sistema (GPS)",
+        "perm_gps_desc" to "Deve essere ACCESA: con la posizione spenta Android rifiuta la ricerca del TFT.",
+        "perm_notif_title" to "Notifiche",
+        "perm_notif_desc" to "Servono per la notifica del servizio di mirroring.",
+        "perm_battery_title" to "Risparmio energetico",
+        "perm_battery_desc" to "Escludi l'app per non far congelare la riconnessione.",
+        "perm_ok" to "OK",
+        "perm_missing" to "Da concedere",
+        "perm_grant" to "Concedi",
+        "perm_open_settings" to "Apri impostazioni",
+        "perm_enable" to "Attiva",
+        "perm_disable" to "Disattiva",
 
         // Diagnostics Screen
         "diag_title" to "Diagnostica",
@@ -63,7 +103,35 @@ object AppTexts {
 
         // QR Scan Screen
         "qr_scan_title" to "Scansiona QR Code",
-        "qr_scan_instruction" to "Inquadra il QR Code mostrato sul display TFT della moto per salvare l'HUD."
+        "qr_scan_instruction" to "Inquadra il QR Code mostrato sul display TFT della moto per salvare l'HUD.",
+
+        // Garage
+        "garage_title" to "Garage",
+        "garage_sub" to "Dati del veicolo, scadenze e connessione al TFT",
+        "garage_vehicle_card" to "Veicolo",
+        "garage_name_label" to "Nome moto",
+        "garage_name_hint" to "Lascia vuoto per usare il nome dell'HUD",
+        "garage_plate_label" to "Targa",
+        "garage_deadline_revision" to "Revisione tecnica",
+        "garage_deadline_tax" to "Tassa di circolazione",
+        "garage_deadline_insurance" to "Assicurazione",
+        "garage_month_label" to "Mese",
+        "garage_day_label" to "Giorno",
+        "garage_day_whole_month" to "Tutto il mese",
+        "garage_deadline_info_title" to "Come funziona il giorno",
+        "garage_deadline_info_text" to "Il giorno e' libero: chi ha la scadenza \"entro il mese\" lascia 0 (vale l'ultimo giorno del mese), chi ha una data precisa inserisce il giorno esatto (1-31).",
+        "garage_info_card" to "Informazioni",
+        "garage_notifications_card" to "Avvisi di scadenza",
+        "garage_notifications_switch" to "Inviami notifiche",
+        "garage_notifications_desc" to "Promemoria per revisione, tassa e assicurazione.",
+        "garage_days_before_label" to "Avvisami %d giorni prima",
+        "garage_forget" to "Dimentica",
+        "garage_scan_qr" to "Scansiona QR",
+        "garage_rearm" to "Riattiva avviso",
+        "garage_countdown_today" to "oggi",
+        "garage_countdown_days" to "tra %d giorni",
+        "garage_countdown_months" to "tra %d mesi",
+        "garage_countdown_none" to "non impostata",
     )
 
     private val enMap = mapOf(
@@ -78,7 +146,7 @@ object AppTexts {
         "common_name" to "Name",
 
         // Theme
-        "theme_dark" to "🌙 Dark (Default)",
+        "theme_dark" to "🌙 Dark",
         "theme_light" to "☀️ Light",
         "theme_system" to "📱 System",
 
@@ -95,10 +163,23 @@ object AppTexts {
 
         // Settings Screen
         "settings_title" to "Settings",
+        "settings_menu_title" to "Settings",
+        "settings_menu_sub" to "Configure the app, the connection and permissions",
+        "settings_cat_general_title" to "General",
+        "settings_cat_general_sub" to "Language and app theme",
+        "settings_cat_connections_title" to "Connections",
+        "settings_cat_connections_sub" to "Connection and reconnection behaviour",
+        "settings_cat_resolution_title" to "Resolution",
+        "settings_cat_resolution_sub" to "Screen size sent to the TFT",
+        "settings_cat_permissions_title" to "Permissions",
+        "settings_cat_permissions_sub" to "Granting the required permissions",
+        "settings_cat_development_title" to "Developer Options",
+        "settings_cat_development_sub" to "Diagnostics and experimental settings",
         "settings_language_title" to "App Language",
-        "settings_language_desc" to "Select interface language (Italian / English)",
+        "settings_language_desc" to "Select the interface language.",
         "settings_theme_title" to "Graphic Theme",
-        "settings_theme_desc" to "Select application appearance (Default: Dark)",
+        "settings_theme_desc" to "Select the application appearance.",
+        "settings_vibrate_toast" to "Vibration enabled",
         "settings_startup_title" to "Startup Behavior",
         "settings_startup_manual" to "Saved credentials only",
         "settings_startup_manual_desc" to "Shows saved HUD name. Link and video start only by pressing Start.",
@@ -106,14 +187,41 @@ object AppTexts {
         "settings_startup_autolink_desc" to "Rebuilds Wi-Fi Direct automatically and shows name. Video starts only by pressing Start.",
         "settings_startup_autolink_stream" to "Connect and stream",
         "settings_startup_autolink_stream_desc" to "Rebuilds link and also starts video. Android still requests screen capture consent.",
-        "settings_encoder_idle_title" to "H.264 Encoder Suspension",
-        "settings_encoder_idle_desc" to "Suspends video encoding after N minutes of waiting to save battery and heat.",
-        "settings_encoder_idle_label" to "Suspend encoder after: %d min (0 = never)",
+        "settings_encoder_idle_title" to "Active reconnection wait",
+        "settings_encoder_idle_desc" to "How many minutes the app actively tries to reconnect to the TFT. Beyond that it switches to passive listening: no attempts, but reconnection still happens automatically when the TFT returns.",
+        "settings_active_wait_label" to "Active wait: %d min",
+        "settings_vibrate_title" to "Vibrate on connection",
+        "settings_vibrate_desc" to "Short vibration when the TFT link connects or is lost. Useful with the phone in your pocket.",
+
+        // Link causes (user-facing messages)
+        "link_cause_p2p_off" to "Wi-Fi Direct is off: enable it in system settings.",
+        "link_cause_busy" to "The HUD may be connected to another phone.",
+        "link_cause_no_peer" to "TFT not found: check that it is on and nearby.",
+        "link_cause_passive" to "Passively waiting for the TFT (resumes by itself when powered on).",
         "settings_clock_sync_title" to "TFT Clock Synchronization",
         "settings_clock_sync_desc" to "The TFT sets time by receiving a burst of clock packets at connection startup (one every 250 ms). This value is the number of sent packets (minimum 3).",
         "settings_clock_sync_label" to "Clock push: %d packets (handshake burst)",
         "settings_diagnostics_entry" to "Log & Diagnostics",
         "settings_diagnostics_entry_desc" to "View live events and configure file log saving.",
+
+        // Permissions & reliability
+        "perm_section_title" to "Permissions & reliability",
+        "perm_section_desc" to "Required for the Wi-Fi Direct link and for automatic reconnection while the app is in background.",
+        "perm_all_ok" to "All good: automatic reconnection works in background too.",
+        "perm_location_title" to "Precise location",
+        "perm_location_desc" to "Required: Android needs it for the Wi-Fi Direct APIs.",
+        "perm_gps_title" to "System location (GPS)",
+        "perm_gps_desc" to "Must be ON: with location off Android refuses to look for the TFT.",
+        "perm_notif_title" to "Notifications",
+        "perm_notif_desc" to "Needed for the mirroring service notification.",
+        "perm_battery_title" to "Battery optimization",
+        "perm_battery_desc" to "Exclude the app so reconnection is not frozen.",
+        "perm_ok" to "OK",
+        "perm_missing" to "Not granted",
+        "perm_grant" to "Grant",
+        "perm_open_settings" to "Open settings",
+        "perm_enable" to "Enable",
+        "perm_disable" to "Disable",
 
         // Diagnostics Screen
         "diag_title" to "Diagnostics",
@@ -128,7 +236,35 @@ object AppTexts {
 
         // QR Scan Screen
         "qr_scan_title" to "Scan QR Code",
-        "qr_scan_instruction" to "Frame the QR Code shown on the motorcycle TFT display to save the HUD."
+        "qr_scan_instruction" to "Frame the QR Code shown on the motorcycle TFT display to save the HUD.",
+
+        // Garage
+        "garage_title" to "Garage",
+        "garage_sub" to "Vehicle data, deadlines and TFT connection",
+        "garage_vehicle_card" to "Vehicle",
+        "garage_name_label" to "Bike name",
+        "garage_name_hint" to "Leave empty to use the HUD name",
+        "garage_plate_label" to "Plate",
+        "garage_deadline_revision" to "Technical inspection",
+        "garage_deadline_tax" to "Road tax",
+        "garage_deadline_insurance" to "Insurance",
+        "garage_month_label" to "Month",
+        "garage_day_label" to "Day",
+        "garage_day_whole_month" to "Whole month",
+        "garage_deadline_info_title" to "How the day works",
+        "garage_deadline_info_text" to "The day is free: if the deadline is \"within the month\" leave 0 (the last day of the month is used), if it is a precise date enter the exact day (1-31).",
+        "garage_info_card" to "Information",
+        "garage_notifications_card" to "Deadline reminders",
+        "garage_notifications_switch" to "Send me notifications",
+        "garage_notifications_desc" to "Reminders for inspection, road tax and insurance.",
+        "garage_days_before_label" to "Remind me %d days before",
+        "garage_forget" to "Forget",
+        "garage_scan_qr" to "Scan QR",
+        "garage_rearm" to "Re-enable reminder",
+        "garage_countdown_today" to "today",
+        "garage_countdown_days" to "in %d days",
+        "garage_countdown_months" to "in %d months",
+        "garage_countdown_none" to "not set",
     )
 
     fun get(key: String, language: AppLanguage): String {

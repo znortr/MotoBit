@@ -1,48 +1,91 @@
 package com.nos.motobitride.navigation
 
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.slideInHorizontally
+import androidx.compose.animation.slideOutHorizontally
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
-import androidx.navigation.compose.NavHost
 import androidx.navigation.NavHostController
+import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.nos.motobitride.core.qr.QrContent
 import com.nos.motobitride.feature.ap.QrScanScreen
-import com.nos.motobitride.feature.diagnostics.DiagnosticsScreen
+import com.nos.motobitride.feature.garage.GarageScreen
 import com.nos.motobitride.feature.hud.HudScreen
-import com.nos.motobitride.feature.login.LoginScreen
+import com.nos.motobitride.feature.settings.SettingsConnectionsScreen
+import com.nos.motobitride.feature.settings.SettingsDevelopmentScreen
+import com.nos.motobitride.feature.settings.SettingsGeneralScreen
+import com.nos.motobitride.feature.settings.SettingsPermissionsScreen
+import com.nos.motobitride.feature.settings.SettingsResolutionScreen
 import com.nos.motobitride.feature.settings.SettingsScreen
 
 @Composable
-fun AppNavGraph (
+fun AppNavGraph(
     navController: NavHostController,
     startDestination: String = AppDestination.Hud.route
 ) {
-    NavHost (
+    fun navigateTopLevel(route: String) {
+        if (navController.currentDestination?.route != route) {
+            navController.navigate(route) {
+                popUpTo(AppDestination.Hud.route) {
+                    saveState = true
+                }
+                launchSingleTop = true
+                restoreState = true
+            }
+        }
+    }
+
+    fun goBackFrom(route: String) {
+        if (navController.currentDestination?.route == route) {
+            navController.popBackStack()
+        }
+    }
+
+    NavHost(
         navController = navController,
-        startDestination = startDestination
+        startDestination = startDestination,
+        enterTransition = { slideInHorizontally(initialOffsetX = { it }) + fadeIn() },
+        exitTransition = { slideOutHorizontally(targetOffsetX = { -it }) + fadeOut() },
+        popEnterTransition = { slideInHorizontally(initialOffsetX = { -it }) + fadeIn() },
+        popExitTransition = { slideOutHorizontally(targetOffsetX = { it }) + fadeOut() }
     ) {
         composable(AppDestination.Hud.route) { backStackEntry ->
-            // Observe qrResult as State so Hud recomposes when it changes
             val qrResultState = backStackEntry
                 .savedStateHandle
                 .getStateFlow<QrContent?>("qrResult", QrContent.Unknown)
                 .collectAsState()
 
             HudScreen(
-                qrResultState.value,
+                hudQrValue = qrResultState.value,
                 onShowQrScanner = {
                     navController.navigate(AppDestination.QrScan.route)
                 },
-                onOpenSettings = {
-                    navController.navigate(AppDestination.Settings.route)
-                }
+                onNavigateHome = { navigateTopLevel(AppDestination.Hud.route) },
+                onNavigateGarage = { navigateTopLevel(AppDestination.Garage.route) },
+                onNavigateSettings = { navigateTopLevel(AppDestination.Settings.route) }
+            )
+        }
+
+        composable(AppDestination.Garage.route) { backStackEntry ->
+            val qrResultState = backStackEntry
+                .savedStateHandle
+                .getStateFlow<QrContent?>("qrResult", QrContent.Unknown)
+                .collectAsState()
+
+            GarageScreen(
+                hudQrValue = qrResultState.value,
+                onNavigateHome = { navigateTopLevel(AppDestination.Hud.route) },
+                onNavigateGarage = { navigateTopLevel(AppDestination.Garage.route) },
+                onNavigateSettings = { navigateTopLevel(AppDestination.Settings.route) },
+                onScanQr = { navController.navigate(AppDestination.QrScan.route) }
             )
         }
 
         composable(AppDestination.QrScan.route) {
             QrScanScreen(
                 onQrScanned = { qrValue ->
-                    // send result back to the previous destination
                     navController.previousBackStackEntry?.savedStateHandle?.set("qrResult", qrValue)
                     if (navController.currentDestination?.route == AppDestination.QrScan.route) {
                         navController.popBackStack()
@@ -56,36 +99,49 @@ fun AppNavGraph (
             )
         }
 
+        // ------------------------------------------------------------------
+        // Impostazioni: menu + sottopagine
+        // ------------------------------------------------------------------
         composable(AppDestination.Settings.route) {
             SettingsScreen(
-                onBack = {
-                    if (navController.currentDestination?.route == AppDestination.Settings.route) {
-                        navController.popBackStack()
-                    }
-                },
-                onOpenDiagnostics = {
-                    navController.navigate(AppDestination.Diagnostics.route)
-                }
+                onNavigateHome = { navigateTopLevel(AppDestination.Hud.route) },
+                onNavigateGarage = { navigateTopLevel(AppDestination.Garage.route) },
+                onNavigateSettings = { navigateTopLevel(AppDestination.Settings.route) },
+                onOpenGeneral = { navController.navigate(AppDestination.SettingsGeneral.route) },
+                onOpenConnections = { navController.navigate(AppDestination.SettingsConnections.route) },
+                onOpenResolution = { navController.navigate(AppDestination.SettingsResolution.route) },
+                onOpenPermissions = { navController.navigate(AppDestination.SettingsPermissions.route) },
+                onOpenDevelopment = { navController.navigate(AppDestination.SettingsDevelopment.route) }
             )
         }
 
-        composable(AppDestination.Diagnostics.route) {
-            DiagnosticsScreen(
-                onBack = {
-                    if (navController.currentDestination?.route == AppDestination.Diagnostics.route) {
-                        navController.popBackStack()
-                    }
-                }
+        composable(AppDestination.SettingsGeneral.route) {
+            SettingsGeneralScreen(
+                onBack = { goBackFrom(AppDestination.SettingsGeneral.route) }
             )
         }
 
-        composable(AppDestination.Login.route) {
-            LoginScreen(
-                onLoginSuccess = {
-                    navController.navigate(AppDestination.Hud.route) {
-                        popUpTo(AppDestination.Login.route) { inclusive = true }
-                    }
-                }
+        composable(AppDestination.SettingsConnections.route) {
+            SettingsConnectionsScreen(
+                onBack = { goBackFrom(AppDestination.SettingsConnections.route) }
+            )
+        }
+
+        composable(AppDestination.SettingsResolution.route) {
+            SettingsResolutionScreen(
+                onBack = { goBackFrom(AppDestination.SettingsResolution.route) }
+            )
+        }
+
+        composable(AppDestination.SettingsPermissions.route) {
+            SettingsPermissionsScreen(
+                onBack = { goBackFrom(AppDestination.SettingsPermissions.route) }
+            )
+        }
+
+        composable(AppDestination.SettingsDevelopment.route) {
+            SettingsDevelopmentScreen(
+                onBack = { goBackFrom(AppDestination.SettingsDevelopment.route) }
             )
         }
     }

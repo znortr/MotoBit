@@ -26,89 +26,38 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
-import androidx.compose.material3.TextButton
-import androidx.compose.material3.TopAppBar
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.DisposableEffect
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberUpdatedState
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.SpanStyle
-import androidx.compose.ui.text.buildAnnotatedString
-import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.withStyle
-import androidx.compose.ui.tooling.preview.Preview
+import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
-import com.nos.motobitride.core.hud.HudStreamController
+import com.nos.motobitride.core.hud.HudSession
 import com.nos.motobitride.core.hud.ScreenCaptureService
 import com.nos.motobitride.core.hud.StreamState
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.qr.QrContent
 import com.nos.motobitride.core.settings.AppSettings
+import com.nos.motobitride.core.settings.PermissionsHelper
 import com.nos.motobitride.core.settings.StartupBehavior
 import com.nos.motobitride.feature.ap.WifiApController
+import com.nos.motobitride.ui.components.MotobitTopAppBar
+import com.nos.motobitride.ui.i18n.AppLanguage
 import com.nos.motobitride.ui.i18n.AppTexts
-import com.nos.motobitride.ui.theme.MotobitRideTheme
+import kotlinx.coroutines.flow.MutableStateFlow
 
 private const val TAG_UI = "HudScreen"
 
-@Composable
-fun rememberHudStreamController(): HudStreamController {
-    val appContext = LocalContext.current.applicationContext
-    val controller = remember { HudStreamController(appContext) }
-
-    DisposableEffect(Unit) {
-        onDispose { controller.stop() }
-    }
-
-    return controller
-}
-
-@Composable
-fun rememberWifiApController(
-    onHudConnected: (String?) -> Unit,
-    onHudDisconnected: () -> Unit = {}
-): WifiApController {
-    val context = LocalContext.current.applicationContext
-    val connected = rememberUpdatedState(onHudConnected)
-    val disconnected = rememberUpdatedState(onHudDisconnected)
-
-    val controller = remember(context) {
-        WifiApController(
-            context = context,
-            onHudConnected = { ip -> connected.value(ip) },
-            onHudDisconnected = { disconnected.value() }
-        )
-    }
-
-    DisposableEffect(controller) {
-        onDispose { controller.dispose() }
-    }
-
-    return controller
-}
-
-fun requiredWifiPermissions(): Array<String> {
-    val list = mutableListOf<String>()
-    list += Manifest.permission.ACCESS_FINE_LOCATION
-
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-        list += Manifest.permission.NEARBY_WIFI_DEVICES
-        list += Manifest.permission.POST_NOTIFICATIONS
-    }
-    return list.toTypedArray()
-}
+fun requiredWifiPermissions(): Array<String> = PermissionsHelper.requiredRuntimePermissions()
 
 fun Context.getActivity(): ComponentActivity? = when (this) {
     is ComponentActivity -> this
@@ -120,43 +69,41 @@ fun Context.getActivity(): ComponentActivity? = when (this) {
 @Composable
 fun HudScreen(
     hudQrValue: QrContent?,
-    hudStreamController: HudStreamController = rememberHudStreamController(),
     onShowQrScanner: () -> Unit = {},
-    onOpenSettings: () -> Unit = {}
+    onNavigateHome: () -> Unit = {},
+    onNavigateGarage: () -> Unit = {},
+    onNavigateSettings: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
+    val isPreview = LocalInspectionMode.current
+
+    // La sessione vive nel processo (HudSession), non nel Composable: cosi'
+    // sopravvive al passaggio in background e alla distruzione dell'Activity.
+    if (!isPreview) {
+        remember(ctx) { HudSession.ensure(ctx) }
+    }
+
+    val hudStreamController = if (isPreview) null else HudSession.stream
+    val wifiController = if (isPreview) null else HudSession.link
+
     val currentLang by AppSettings.language.collectAsState()
     val permissions = remember { requiredWifiPermissions() }
 
-    val versionName = remember(ctx) {
-        runCatching {
-            ctx.packageManager.getPackageInfo(ctx.packageName, 0).versionName
-        }.getOrNull() ?: "1.1.4"
-    }
+    // Flussi di fallback: collectAsState va chiamato sempre, anche in Preview.
+    val idleStateFlow = remember { MutableStateFlow(StreamState.IDLE) }
+    val idleStatusFlow = remember { MutableStateFlow("") }
+    val streamState by (hudStreamController?.state ?: idleStateFlow).collectAsState()
+    val statusText by (hudStreamController?.status ?: idleStatusFlow).collectAsState()
 
-    val streamState by hudStreamController.state.collectAsState()
-    val statusText by hudStreamController.status.collectAsState()
     val savedHud by SavedHud.current.collectAsState()
     val startupBehavior by AppSettings.startup.collectAsState()
-    val encoderIdleMinutes by AppSettings.encoderIdleMinutes.collectAsState()
-
-    // Timeout di sospensione encoder scelto nelle Impostazioni (0 = mai)
-    LaunchedEffect(encoderIdleMinutes) {
-        hudStreamController.setEncoderIdleTimeoutMs(encoderIdleMinutes.toLong() * 60_000L)
-    }
 
     val mediaProjectionManager = remember {
-        ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as MediaProjectionManager
-    }
-
-    val mediaProjectionState by ScreenCaptureService.mediaProjectionFlow.collectAsState()
-
-    LaunchedEffect(mediaProjectionState) {
-        mediaProjectionState?.let { hudStreamController.setMediaProjection(it) }
+        if (isPreview) null
+        else ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
     }
 
     var projectionRequested by remember { mutableStateOf(false) }
-    var streamRequested by remember { mutableStateOf(false) }
 
     val screenCaptureLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.StartActivityForResult()
@@ -180,42 +127,25 @@ fun HudScreen(
     }
 
     fun requestScreenCapture() {
-        if (projectionRequested) return
+        if (projectionRequested || isPreview) return
         projectionRequested = true
         try {
             AppLog.i(TAG_UI, "Richiesta consenso cattura schermo")
-            screenCaptureLauncher.launch(mediaProjectionManager.createScreenCaptureIntent())
+            mediaProjectionManager?.let { screenCaptureLauncher.launch(it.createScreenCaptureIntent()) }
         } catch (t: Throwable) {
             projectionRequested = false
             AppLog.e(TAG_UI, "Impossibile aprire il dialog di cattura", t)
         }
     }
 
-    LaunchedEffect(streamState) {
-        when (streamState) {
-            StreamState.AWAITING_PROJECTION -> requestScreenCapture()
-            else -> projectionRequested = false
+    if (!isPreview) {
+        LaunchedEffect(streamState) {
+            when (streamState) {
+                StreamState.AWAITING_PROJECTION -> requestScreenCapture()
+                else -> projectionRequested = false
+            }
         }
     }
-
-    val wifiController = rememberWifiApController(
-        onHudConnected = { ip ->
-            AppLog.i(TAG_UI, "Link P2P attivo, ip=$ip")
-            hudStreamController.setPreferredHost(ip, WifiApController.DEFAULT_HUD_PORT)
-
-            val wantsStream = streamRequested ||
-                    startupBehavior == StartupBehavior.AUTO_LINK_AND_STREAM
-            if (wantsStream &&
-                (hudStreamController.state.value == StreamState.IDLE ||
-                        hudStreamController.state.value == StreamState.ERROR)
-            ) {
-                hudStreamController.start()
-            }
-        },
-        onHudDisconnected = {
-            AppLog.w(TAG_UI, "Link P2P perso")
-        }
-    )
 
     val permissionLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -226,104 +156,78 @@ fun HudScreen(
         } else {
             (hudQrValue as? QrContent.HudWifi)?.let { qr ->
                 SavedHud.save(qr)
-                wifiController.connect(qr)
+                wifiController?.connect(qr)
             }
         }
     }
 
-    LaunchedEffect(hudQrValue) {
-        when (hudQrValue) {
-            is QrContent.HudWifi -> {
-                SavedHud.save(hudQrValue)
+    if (!isPreview) {
+        LaunchedEffect(hudQrValue) {
+            when (hudQrValue) {
+                is QrContent.HudWifi -> {
+                    SavedHud.save(hudQrValue)
 
-                val allGranted = permissions.all { perm ->
-                    ContextCompat.checkSelfPermission(ctx, perm) ==
-                            PackageManager.PERMISSION_GRANTED
+                    val allGranted = permissions.all { perm ->
+                        ContextCompat.checkSelfPermission(ctx, perm) ==
+                                PackageManager.PERMISSION_GRANTED
+                    }
+                    if (!allGranted) {
+                        permissionLauncher.launch(permissions)
+                    } else {
+                        wifiController?.connect(hudQrValue)
+                    }
                 }
-                if (!allGranted) {
-                    permissionLauncher.launch(permissions)
-                } else {
-                    wifiController.connect(hudQrValue)
-                }
+                is QrContent.BadQr -> AppLog.w(TAG_UI, "QR HUD non valido")
+                else -> Unit
             }
-            is QrContent.BadQr -> AppLog.w(TAG_UI, "QR HUD non valido")
-            else -> Unit
         }
     }
 
     var startupApplied by remember { mutableStateOf(false) }
-    LaunchedEffect(savedHud) {
-        if (startupApplied) return@LaunchedEffect
-        val hud = savedHud ?: return@LaunchedEffect
-        startupApplied = true
+    if (!isPreview) {
+        LaunchedEffect(savedHud) {
+            if (startupApplied) return@LaunchedEffect
+            val hud = savedHud ?: return@LaunchedEffect
+            startupApplied = true
 
-        AppLog.i(
-            TAG_UI,
-            "Avvio: modalita' ${startupBehavior.name}, HUD memorizzato " +
-                    hud.displayName
-        )
+            AppLog.i(
+                TAG_UI,
+                "Avvio: modalita' ${startupBehavior.name}, HUD memorizzato " +
+                        hud.displayName
+            )
 
-        when (startupBehavior) {
-            StartupBehavior.MANUAL -> Unit
+            when (startupBehavior) {
+                StartupBehavior.MANUAL -> Unit
 
-            StartupBehavior.AUTO_LINK -> {
-                if (!wifiController.isHudConnected) {
-                    wifiController.connect(hud.toQrContent())
+                StartupBehavior.AUTO_LINK -> {
+                    if (wifiController?.isHudConnected == false) {
+                        wifiController.connect(hud.toQrContent())
+                    }
                 }
-            }
 
-            StartupBehavior.AUTO_LINK_AND_STREAM -> {
-                streamRequested = true
-                if (!wifiController.isHudConnected) {
-                    wifiController.connect(hud.toQrContent())
-                }
-                if (wifiController.isHudConnected) {
-                    hudStreamController.start()
+                StartupBehavior.AUTO_LINK_AND_STREAM -> {
+                    HudSession.requestStream()
+                    if (wifiController?.isHudConnected == false) {
+                        wifiController.connect(hud.toQrContent())
+                    }
+                    if (wifiController?.isHudConnected == true) {
+                        hudStreamController?.start()
+                    }
                 }
             }
         }
     }
 
     val isActive = streamState != StreamState.IDLE && streamState != StreamState.ERROR
-    val linkConnected = wifiController.isHudConnected
+    val linkConnected = wifiController?.isHudConnected ?: false
     val hudName = savedHud?.displayName ?: "-"
 
     Scaffold(
         topBar = {
-            TopAppBar(
-                title = {
-                    Column {
-                        val motoColor = MaterialTheme.colorScheme.onBackground
-                        val bitColor = Color(0xFFFF3B30)
-                        val titleText = remember(motoColor) {
-                            buildAnnotatedString {
-                                withStyle(style = SpanStyle(color = motoColor, fontWeight = FontWeight.Bold)) {
-                                    append("Moto")
-                                }
-                                withStyle(style = SpanStyle(color = bitColor, fontWeight = FontWeight.Bold)) {
-                                    append("Bit")
-                                }
-                            }
-                        }
-                        Text(
-                            text = titleText,
-                            style = MaterialTheme.typography.titleLarge
-                        )
-                        Text(
-                            text = "v$versionName",
-                            style = MaterialTheme.typography.labelSmall,
-                            color = MaterialTheme.colorScheme.onBackground.copy(alpha = 0.6f)
-                        )
-                    }
-                },
-                actions = {
-                    TextButton(onClick = onShowQrScanner) {
-                        Text(AppTexts.get("hud_scan_qr", currentLang))
-                    }
-                    TextButton(onClick = onOpenSettings) {
-                        Text(AppTexts.get("settings_title", currentLang))
-                    }
-                }
+            MotobitTopAppBar(
+                onNavigateHome = onNavigateHome,
+                onNavigateGarage = onNavigateGarage,
+                onNavigateSettings = onNavigateSettings
             )
         }
     ) { innerPadding ->
@@ -350,7 +254,7 @@ fun HudScreen(
                     Text(
                         text = AppTexts.get("hud_status", currentLang) +
                                 (if (linkConnected) "ONLINE" else "OFFLINE") +
-                                "   ip=${wifiController.hudIp ?: "-"}",
+                                "   ip=${wifiController?.hudIp ?: "-"}",
                         style = MaterialTheme.typography.bodyMedium
                     )
                     Text(
@@ -359,15 +263,14 @@ fun HudScreen(
                     )
                     Text(text = statusText, style = MaterialTheme.typography.bodySmall)
                     Text(
-                        text = if (wifiController.lastEvent.isNotEmpty())
-                            "link: ${wifiController.lastEvent}" else "link: -",
+                        text = friendlyLinkEvent(wifiController?.lastEvent, currentLang),
                         style = MaterialTheme.typography.bodySmall
                     )
                     val mirroringSuffix =
-                        if (hudStreamController.isLiveMirroring) "  (mirroring ON)" else ""
+                        if (hudStreamController?.isLiveMirroring == true) "  (mirroring ON)" else ""
                     Text(
-                        text = "Video: " + hudStreamController.negotiatedWidth + "x" +
-                                hudStreamController.negotiatedHeight + mirroringSuffix,
+                        text = "Video: " + (hudStreamController?.negotiatedWidth ?: 592) + "x" +
+                                (hudStreamController?.negotiatedHeight ?: 752) + mirroringSuffix,
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
@@ -388,17 +291,19 @@ fun HudScreen(
                                     Manifest.permission.NEARBY_WIFI_DEVICES
                                 ) == PackageManager.PERMISSION_GRANTED -> {
                                     AppLog.i(TAG_UI, "Avvia premuto")
-                                    streamRequested = true
+                                    // Ricorda che l'utente vuole il video: al ritorno
+                                    // del link la sessione riparte da sola.
+                                    HudSession.requestStream()
 
                                     val hud = savedHud
-                                    if (hud != null && !wifiController.isHudConnected) {
+                                    if (hud != null && wifiController?.isHudConnected == false) {
                                         wifiController.connect(hud.toQrContent())
-                                    } else if (wifiController.isHudConnected) {
-                                        hudStreamController.setPreferredHost(
+                                    } else if (wifiController?.isHudConnected == true) {
+                                        hudStreamController?.setPreferredHost(
                                             wifiController.hudIp,
                                             WifiApController.DEFAULT_HUD_PORT
                                         )
-                                        hudStreamController.start()
+                                        hudStreamController?.start()
                                     } else {
                                         AppLog.w(TAG_UI, "Nessun HUD: scansiona il QR")
                                         Toast.makeText(
@@ -443,8 +348,7 @@ fun HudScreen(
                 OutlinedButton(
                     onClick = {
                         AppLog.i(TAG_UI, "Stop premuto")
-                        streamRequested = false
-                        hudStreamController.stop()
+                        HudSession.stopStream()
                     },
                     enabled = isActive
                 ) {
@@ -452,26 +356,44 @@ fun HudScreen(
                 }
             }
 
-            OutlinedButton(
-                onClick = {
-                    AppLog.i(TAG_UI, "Chiudi premuto")
-                    streamRequested = false
-                    hudStreamController.close()
-                    wifiController.disconnect()
-                    ScreenCaptureService.stopService(ctx)
-                    ctx.getActivity()?.finishAndRemoveTask()
+            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                OutlinedButton(
+                    onClick = onShowQrScanner
+                ) {
+                    Text(AppTexts.get("hud_scan_qr", currentLang))
                 }
-            ) {
-                Text(AppTexts.get("common_close", currentLang))
+
+                OutlinedButton(
+                    onClick = {
+                        AppLog.i(TAG_UI, "Chiudi premuto")
+                        HudSession.closeAll()
+                        ScreenCaptureService.stopService(ctx)
+                        ctx.getActivity()?.finishAndRemoveTask()
+                    }
+                ) {
+                    Text(AppTexts.get("common_close", currentLang))
+                }
             }
         }
     }
 }
 
-@Preview(showBackground = true)
-@Composable
-fun HudScreenPreview() {
-    MotobitRideTheme {
-        HudScreen(hudQrValue = null)
+/**
+ * Traduce l'evento tecnico del link in un messaggio comprensibile.
+ * Gli eventi non riconosciuti restano visibili cosi' come sono (utili in diagnosi).
+ */
+private fun friendlyLinkEvent(event: String?, lang: AppLanguage): String {
+    if (event.isNullOrBlank()) return "link: -"
+    return when {
+        event.contains("Wi-Fi Direct disattivato") ->
+            AppTexts.get("link_cause_p2p_off", lang)
+
+        event.contains("BUSY") ->
+            AppTexts.get("link_cause_busy", lang)
+
+        event.contains("nessun peer") ->
+            AppTexts.get("link_cause_no_peer", lang)
+
+        else -> "link: $event"
     }
 }

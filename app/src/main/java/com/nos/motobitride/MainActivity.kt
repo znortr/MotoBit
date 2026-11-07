@@ -7,6 +7,8 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.rememberNavController
+import com.nos.motobitride.core.garage.DeadlineWorker
+import com.nos.motobitride.core.garage.VehicleStore
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
@@ -17,9 +19,14 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
 
-        // Impostazioni e HUD memorizzato vanno caricati prima della UI
+        // Impostazioni, HUD memorizzato e profilo veicolo vanno caricati prima della UI
         AppSettings.init(applicationContext)
         SavedHud.init(applicationContext)
+        VehicleStore.init(applicationContext)
+
+        // Controllo giornaliero delle scadenze (revisione/tassa/assicurazione).
+        // Idempotente: WorkManager non duplica il lavoro gia' pianificato.
+        DeadlineWorker.schedule(applicationContext)
 
         // Abilita il salvataggio automatico del log su file (Documenti):
         // i test lunghi superano il ring buffer e perderebbero l'inizio.

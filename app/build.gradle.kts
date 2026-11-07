@@ -67,6 +67,14 @@ dependencies {
     implementation(libs.androidx.ui.tooling.preview)
     implementation(libs.androidx.material3)
     implementation(libs.material3)
+
+    // Controllo giornaliero delle scadenze veicolo (sopravvive al riavvio,
+    // nessun permesso per allarmi esatti)
+    implementation("androidx.work:work-runtime-ktx:2.9.1")
+    // Solo le icone core (Home, Settings): l'icona moto e' un vettoriale locale
+    // (res/drawable/ic_moto.xml). material-icons-extended aggiungeva ~50 MB di
+    // dex per una sola icona.
+    implementation("androidx.compose.material:material-icons-core")
     testImplementation(libs.junit)
     androidTestImplementation(libs.androidx.junit)
     androidTestImplementation(libs.androidx.espresso.core)

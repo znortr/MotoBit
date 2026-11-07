@@ -4,6 +4,460 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 1.3.3 — Revert delle due regressioni introdotte da me
+
+**Data**: 2026-11-06 · **versionCode**: 1303
+
+Due regressioni introdotte nelle versioni precedenti, entrambe **non presenti** nel
+codice originale. Riportate al comportamento di partenza.
+
+### Regressione 1 — "Avvia" non rispondeva per 2-3 secondi
+**Causa**: in 1.1.6 avevo reso **asincrono** `teardownP2p()`: prima di iniziare la
+connessione aspettava il callback di `requestGroupInfo`/`removeGroup`, con un
+timeout di sicurezza di **2 secondi**. Il `connect` partiva solo dopo quell'attesa,
+percepita come "il tasto non fa nulla".
+
+**Fix**: `teardownP2p()` è tornato **sincrono** (fire-and-forget): `removeGroup`
+non viene atteso, il `connect` parte immediatamente. Il rischio di `BUSY` è
+gestito dal retry, non dall'attesa.
+
+### Regressione 2 — Video a scatti
+**Causa**: in 1.1.7 avevo introdotto `FrameSender`, una coda di **10 frame** che
+**scarta i frame quando è piena**. Prima la spinta era sincrona: `PushFrame`
+lato Go scrive in un ring buffer **in memoria** (non sulla socket), quindi non
+blocca. La coda introduceva frame mancanti → microscatti.
+
+**Fix**: rimosso `FrameSender`. La spinta è di nuovo **sincrona** dal thread di
+drain, identica all'originale.
+
+### Miglioramento (non regressione)
+- `WifiApController.lastEvent` è ora `mutableStateOf`: la UI si aggiorna in tempo
+  reale sullo stato del link (prima non si ricomponeva e sembrava "fermo").
+- Se un tentativo resta appeso oltre **5 s**, il successivo tocco su "Avvia" ne
+  avvia uno nuovo invece di essere ignorato.
+
+### Invariato
+Recupero P2P passivo, `retryPassive`, `passiveWait`, `onLinkRestored`,
+`probeInFlight`, guardia `connecting`, FGS `location`, notifiche: **non toccati**.
+
+---
+
+## 🚀 1.3.2 — Guardia `connecting` auto-riparante
+
+**Data**: 2026-11-06 · **versionCode**: 1302
+
+La guardia anti-doppio-handshake introdotta in 1.3.1 poteva, in teoria, bloccare
+per sempre le riconnessioni se un handshake si fosse appeso. Ora si auto-ripara:
+
+- `connectingSince` registra l'inizio dell'handshake;
+- `isConnecting()` restituisce `false` se sono passati più di **90 s**
+  (l'handshake Go ha `startupTimeout = 10 s`, quindi 90 s è un margine ampio);
+- `beginDiscovery()` e `onLinkRestored()` usano `isConnecting()`, così dopo la
+  soglia riprendono a funzionare da sole;
+- log esplicito: *"Handshake precedente bloccato da oltre 90s: lo considero caduto"*.
+
+Nessun'altra modifica al percorso di streaming.
+
+---
+
+## 🚀 1.3.1 — Fix trasmissione intermittente (doppia sessione)
+
+**Data**: 2026-11-06 · **versionCode**: 1301
+
+### Sintomo
+Sul TFT l'immagine alternava tra due contenuti (es. YouTube ↔ home), in loop.
+
+### Causa
+Dalla 1.2.4 `HudSession.onHudConnected` chiama `onLinkRestored()`, che avvia
+`beginDiscovery()`. Se la sollecitazione arrivava **mentre un handshake era già
+in corso** (`connectToHost` è bloccante e `isRunning` è ancora `false`), partiva un
+**secondo `connectToHost`**: due `MobileSession` concorrenti sullo stesso HU, di
+cui una orfana. Il TFT riceveva i frame di entrambe → immagine intermittente.
+
+### Fix
+- Nuovo flag `connecting`: `connectToHost` è protetto, e `beginDiscovery()` /
+  `onLinkRestored()` non avviano nulla se un handshake è già in corso.
+  `connectToHost` è stato diviso in wrapper + `connectToHostInternal` con
+  `try/finally` per garantire il reset del flag.
+- Prima di assegnare la nuova sessione, se ne esiste ancora una precedente viene
+  chiusa esplicitamente (niente sessioni orfane).
+- `forceFreshFrame()` non fa più `resize` del VirtualDisplay a ogni riconnessione:
+  il `resize` (invasivo) avviene **solo** uscendo da una pausa vera dell'encoder;
+  sulle riconnessioni normali si chiede solo un IDR al codec.
+
+---
+
+## 🚀 1.3.0 — Garage a card + scadenze con notifica
+
+**Data**: 2026-11-06 · **versionCode**: 1300
+
+### Garage ridisegnato (card)
+- **Nome moto** editabile dall'utente. Se vuoto → nome dell'HUD (`voge 033990`).
+  Rimosso il nome hardcoded `🏍️ Voge 800 Rally`.
+- **Targa** editabile (maiuscole automatiche).
+- **Tre scadenze** con mese (1–12) + giorno (0–31) e conto alla rovescia:
+  revisione tecnica, tassa di circolazione, **assicurazione** (nuova).
+  - `giorno = 0` → *entro il mese* (vale l'ultimo giorno del mese)
+  - `giorno = 1–31` → data precisa
+  - icona **ⓘ** accanto a ogni scadenza → dialog con la spiegazione
+- I tre box sono unificati in una card **Informazioni** con pulsante
+  **Dimentica** (se c'è un HUD) oppure **Scansiona QR** (se non c'è nulla).
+- Card **Avvisi di scadenza**: switch **Inviami notifiche** (default ON) e
+  slider **Avvisami N giorni prima** (default 7, 1–60).
+
+### Notifiche di scadenza (opzione B: nessun Google Calendar)
+- Controllo **giornaliero** con `WorkManager` (sopravvive al riavvio, nessun
+  permesso `SCHEDULE_EXACT_ALARM`), primo giro alle ~09:00 locali.
+- Notifica per singola scadenza:
+  - titolo `Revisione tecnica — tra 5 giorni` (varianti: *scade oggi* / *scade domani*)
+  - testo `Voge 033990 · scadenza 15 marzo 2027`
+  - azioni **Posponi** (snooze 1 giorno) e **Elimina** (sopprime per questa
+    occorrenza, si riarma l'anno successivo)
+- Canale dedicato **"Scadenze veicolo"** con importanza DEFAULT (suona/vibra),
+  separato dal canale silenzioso del mirroring.
+- Nel Garage, se un avviso è stato eliminato compare **Riattiva avviso**.
+
+### Nuovi file
+- `core/garage/VehicleProfile.kt` — dati veicolo + store JSON in SharedPreferences
+- `core/garage/DeadlineReminder.kt` — prossima occorrenza e giorni mancanti
+- `core/garage/DeadlineNotifications.kt` — canale e builder notifica
+- `core/garage/DeadlineWorker.kt` — controllo giornaliero + pianificazione
+- `core/garage/DeadlineActionReceiver.kt` — azioni Posponi/Elimina
+
+### Dipendenze
+- Aggiunta `androidx.work:work-runtime-ktx:2.9.1` (~1 MB).
+
+### Invariato
+Streaming, link P2P, sessione Go, permessi, impostazioni: nessuna modifica.
+
+---
+
+## 🚀 1.2.8 — Sottotitoli spostati sotto la barra
+
+**Data**: 2026-11-06 · **versionCode**: 1208
+
+- Nella barra sticky delle sottopagine resta solo il **titolo** (a destra).
+- Il **sottotitolo** è ora la **prima riga del contenuto**, subito sotto la barra,
+  a larghezza piena: non viene più troncato.
+
+---
+
+## 🚀 1.2.7 — Barra sticky delle sottopagine come la barra MotoBit
+
+**Data**: 2026-11-06 · **versionCode**: 1207
+
+Le sottopagine delle Impostazioni ora usano una `TopAppBar` **sticky** con lo stesso
+stile della barra MotoBit:
+- **sinistra**: `< Indietro` tappabile (al posto del logo);
+- **destra**: titolo della pagina + sottotitolo (al posto delle 3 icone).
+
+Il contenuto scorre sotto la barra. Rimossa la precedente intestazione interna
+(barra Indietro + titolo grande nel corpo della pagina).
+
+---
+
+## 🚀 1.2.6 — Impostazioni riorganizzate in 5 categorie
+
+**Data**: 2026-11-06 · **versionCode**: 1206
+
+### Struttura
+Il menu Impostazioni ora è un elenco di **5 card** (icona colorata, titolo,
+ sottotitolo e chevron `>`). Ogni card apre una **sottopagina con slide-in da destra**,
+con barra `< Indietro` che **sostituisce** la barra MotoBit (più spazio e più pulito).
+
+| Categoria | Contenuto |
+|---|---|
+| **Generale** | Lingua e Tema |
+| **Connessioni** | 1) comportamento all'avvio 2) vibrazione su connessione 3) attesa attiva della riconnessione |
+| **Risoluzione** | Solo titolo e sottotitolo (pronta per le impostazioni future) |
+| **Permessi** | Permessi e affidabilità (invariato) |
+| **Opzioni Sviluppo** | 1) sincronizzazione orologio TFT 2) log e diagnostica (inline) |
+
+### Dettagli
+- **Generale**: tolti i titoli di sezione; il nome sta nella label del select box e la
+  descrizione è **sotto** il box. Rimossi "(Italiano/English)" e "(Default: Scuro)".
+- **Opzioni Sviluppo** sostituisce la vecchia pagina **Diagnostica** (`DiagnosticsScreen`
+  eliminata insieme alla sua rotta).
+- **HUD Memorizzato** spostato dalla pagina Impostazioni alla pagina **Garage**
+  (due card separate: Veicolo e HUD — ridisegno previsto in seguito).
+- Nuova icona vettoriale `ic_cat_resolution.xml` per la categoria Risoluzione.
+
+### Invariato
+Nessuna funzionalità toccata: switch, slider, permessi, log e sincronizzazione orologio
+funzionano come prima.
+
+---
+
+## 🚀 1.2.5 — Icone: una sola immagine da sostituire
+
+**Data**: 2026-11-06 · **versionCode**: 1205
+
+### Pulizia risorse
+- Rimossi i **10 PNG legacy** delle densità (`mipmap-mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi`,
+  `ic_launcher.png` + `ic_launcher_round.png`). Servivano solo ad Android 7 e precedenti:
+  con `minSdk = 29` viene sempre usata l'**icona adattiva** (`mipmap-anydpi`).
+- L'icona dell'app ora dipende da **un solo file**: `res/drawable/ic_launcher_foreground.png`
+  (432×432). Sostituirlo mantenendo il nome aggiorna l'icona ovunque, senza toccare il codice.
+- Aggiunta la cartella **`design/`** (fuori dall'APK) con l'archivio delle immagini,
+  le dimensioni nel nome e un `README.md` con la mappa file → cartella `res/`.
+
+### Invariato
+Nessuna modifica funzionale: solo risorse e documentazione.
+
+---
+
+## 🚀 1.2.4 — Riconnessione immediata al ritorno del link
+
+**Data**: 2026-11-06 · **versionCode**: 1204
+
+### Causa dei 20–30 s
+Alla riaccensione del TFT il link tornava, ma `HudSession` chiamava `start()` solo se lo
+stato era `IDLE`/`ERROR`. Durante un'assenza lo stato è **`WAITING_HUD`** → nessuna
+sollecitazione: si aspettava il timer di `scheduleReconnect`, ormai al **backoff massimo
+di 10 s**, più il probe (fino a 8 s) più l'handshake Go (5–10 s).
+
+### Fix
+- Nuovo `HudStreamController.onLinkRestored(autoResume)`: azzera il backoff, annulla il
+  timer pendente e fa partire **subito** `beginDiscovery()`.
+- `HudSession.onHudConnected` lo chiama sempre (non più solo con stato `IDLE`/`ERROR`).
+- Guardia `probeInFlight`: evita due thread di probe in parallelo quando il link torna
+  mentre un ciclo è già in corso.
+
+---
+
+## 🚀 1.2.3 — Attesa attiva → ascolto passivo (impostazione unica)
+
+**Data**: 2026-11-06 · **versionCode**: 1203
+
+- Sostituito lo slider *"Sospendi encoder dopo: N s"* con **"Attesa attiva: N min"**
+  (default **5**, intervallo 1–30).
+- Per i primi N minuti: encoder in pausa dopo 5 s (interno, non configurabile) e retry P2P
+  attivo. Oltre la soglia: **nessun tentativo**, solo il receiver `PEERS_CHANGED` in ascolto
+  → la riconnessione resta automatica alla riaccensione del TFT.
+- `HudStreamController.setPassiveWait()` e `WifiApController.setPassiveWait()`: fermano solo
+  il timer, non il receiver.
+- Notifica: *"In attesa passiva del TFT"*.
+
+---
+
+## 🚀 1.2.2 — Cattura schermo revocata: avviso esplicito
+
+**Data**: 2026-11-06 · **versionCode**: 1202
+
+- Se il sistema revoca la `MediaProjection` (tipico: revoca mentre l'app è in background),
+  lo stato diventa `AWAITING_PROJECTION` con messaggio **"Cattura schermo revocata: riapri
+  MotoBit per riprendere"**, visibile in Home **e nella notifica**.
+- Su Android 14+ il consenso può essere richiesto solo con l'app visibile: senza questo
+  avviso il TFT restava nero senza spiegazione.
+
+---
+
+## 🚀 1.2.1 — Feedback utente sulla connessione
+
+**Data**: 2026-11-06 · **versionCode**: 1201
+
+- **Notifica con stato live**: non più il testo fisso *"Invio dello schermo all'HUD..."*,
+  ma lo stato reale (`Mirroring 592x752`, `In attesa dell'HUD (tentativo N)`, `In pausa`,
+  `In attesa passiva del TFT`, `Cattura schermo revocata...`).
+- **Azioni nella notifica**: `Stop` e `Riconnetti`, utilizzabili senza aprire l'app
+  (`NotificationActionReceiver`, receiver dichiarato nel manifest).
+- **Vibrazione** breve (60 ms) su connessione/perdita del link: nuovo interruttore in
+  Impostazioni, default **OFF**. Permesso `VIBRATE`.
+- **Messaggi di causa comprensibili** in Home al posto dell'evento tecnico:
+  *Wi-Fi Direct disattivato*, *L'HUD potrebbe essere connesso a un altro telefono* (BUSY),
+  *TFT non trovato*.
+
+---
+
+## 🚀 1.2.0 — Recupero P2P passivo (fine del martellamento su Wi-Fi Direct)
+
+**Data**: 2026-11-06 · **versionCode**: 1200
+
+### Bug corretto
+A ogni tentativo di riconnessione (ogni 3–10 s, per tutta la durata dell'assenza
+del TFT) il codice eseguiva:
+
+```
+teardownP2p()  →  requestGroupInfo + removeGroup
+               →  manager.initialize()   (canale nuovo)
+               →  manager.connect()
+```
+
+Con il peer assente il gruppo **non esiste più**: `removeGroup()` restituiva `BUSY`
+lasciando la macchina a stati del servizio Wi-Fi Direct occupata, e il `connect()`
+seguente partiva su uno stato sporco e falliva. In pratica: smontaggio e rimontaggio
+dell'interfaccia Wi-Fi Direct ogni pochi secondi, per minuti.
+
+### Fix
+- Nuovo `retryPassive()`: riusa il canale esistente e tenta **solo** la connessione.
+  Nessun `removeGroup`, nessun `initialize` durante l'assenza del peer.
+- `initialize()` avviene **una sola volta** per sessione; viene rifatta solo se il
+  canale è davvero morto (`onChannelDisconnected` → azzera canale e manager).
+- **Fast path**: su `WIFI_P2P_PEERS_CHANGED_ACTION`, appena il peer riappare si
+  tenta subito un `connect` senza aspettare il timer → riconnessione più rapida.
+- `attemptInFlight` viene azzerato sui fallimenti: prima restava `true` e la
+  guardia di `retryPassive` avrebbe bloccato ogni tentativo successivo.
+- `removeGroup()` resta solo dove serve davvero: `disconnect()` (Chiudi) e primo
+  tentativo con credenziali nuove.
+
+### Invariato
+Sessione Go, cattura, encoder, sospensione encoder, UI: non toccati.
+
+---
+
+## 🚀 1.1.10 — Revert del rilascio cattura (1.1.9) + cattura esclusa come causa
+
+**Data**: 2026-11-06 · **versionCode**: 1110
+
+### Cosa è stato revertato
+Il rilascio immediato della cattura introdotto in 1.1.9 è stato **rimosso**:
+- alla disconnessione l'app ricreava encoder e VirtualDisplay, ma alla riconnessione
+  **si connetteva senza trasmettere** (regressione);
+- il freeze del video sul telefono **non è migliorato**.
+
+Ripristinato il comportamento di 1.1.8: la cattura resta viva durante l'assenza
+dell'HU, così la ripresa è immediata e senza nuovo consenso.
+
+### Cosa abbiamo imparato (importante)
+Rilasciare la cattura **nell'istante esatto** della caduta **non** evita il freeze.
+Quindi la pipeline di cattura (`VirtualDisplay` + `ImageReader` + encoder) è
+**esclusa** come causa del video congelato sul telefono.
+
+### Sospetti rimasti
+Resta un solo comportamento che correla al 100% con il freeze: il **loop di retry
+P2P** che a ogni tentativo (ogni 3–10 s) esegue `removeGroup` + `initialize` +
+`connect`, martellando lo stack Wi-Fi Direct mentre il peer è assente.
+→ prossimo intervento: **recupero P2P passivo** (nessun teardown, `connect` solo
+quando il peer riappare).
+
+---
+
+## 🚀 1.1.9 — Rilascio immediato della cattura alla caduta della connessione
+
+**Data**: 2026-11-06 · **versionCode**: 1109
+
+### Ipotesi in esame
+Il video delle altre app (YouTube/navigatore) si congela **sul telefono** quando il
+TFT si spegne, e non si riprende (serve pause/play). Esclusi con i test: rete
+(modalità aereo ok), buffering (nessuno spinner), app che "tiene" la pipeline
+(uccidere l'app non sblocca). Resta la combinazione **cattura attiva + teardown
+del gruppo Wi-Fi Direct**.
+
+### Modifica
+- Nuovo `releaseCaptureOnLoss()`: alla **prima** caduta della connessione rilascia
+  subito `VirtualDisplay` + `ImageReader` + thread di cattura + `MediaCodec`.
+- La `MediaProjection` **non** viene rilasciata: resta valida, quindi alla
+  riconnessione `attachMirroring()` ricrea tutto **senza nuovo consenso** alla
+  cattura schermo.
+- Doppio innesco, conta il primo dei due: `scheduleReconnect()` (sessione Go persa)
+  e `onLinkLost()` (gruppo P2P perso, chiamato da `HudSession`).
+- Guardia `captureReleased`: il rilascio avviene **una sola volta per caduta**, non
+  a ogni tentativo di riconnessione. Si riarma quando la cattura viene ricreata.
+- `attachMirroring()` e il rilascio sono serializzati da `captureLock` (arrivano da
+  thread diversi: callback Go, main thread, watchdog).
+
+### Invariato
+Il meccanismo di riconnessione (link P2P + sessione Go) **non è stato toccato**:
+questo è un livello aggiuntivo, non un sostituto.
+
+---
+
+## 🚀 1.1.8 — Fix del video congelato sul TELEFONO durante l'attesa
+
+**Data**: 2026-11-06 · **versionCode**: 1108
+
+### Sintomo
+Con il TFT spento il video **sul telefono** (YouTube/navigatore) si congelava e
+ripartiva solo con pause/play. Il TFT era innocente: mostrava fedelmente ciò che il
+telefono disegnava.
+
+### Causa (misurata con test A/B/C/D/E)
+Il freeze si presentava **solo con "Sospendi encoder dopo: 0 (mai)"**. Con un
+timeout attivo non si presentava. Quindi il colpevole era l'encoder che continuava
+a girare durante l'assenza del TFT:
+- `KEY_I_FRAME_INTERVAL = 0` → **ogni frame è un IDR (all-I)**, la configurazione
+  più costosa possibile, 30 volte al secondo;
+- con il TFT assente quei frame non venivano consumati da nessuno, ma il costo CPU
+  restava identico;
+- il budget CPU/GPU residuo per il decoder video delle altre app crollava → layer
+  video congelato, mentre la UI (composita dalla GPU) restava reattiva.
+
+### Fix
+- La grazia prima della pausa dell'encoder passa da **minuti a secondi**:
+  default **5 s** (era 5 min), intervallo 0-60 s.
+- **`0` non significa più "mai" ma "pausa immediata"**: l'opzione "mai" è stata
+  rimossa perché era esattamente la configurazione che riproduceva il freeze.
+- Nuova chiave di preferenza `encoder_idle_timeout_sec`: il vecchio valore in
+  minuti viene ignorato di proposito (letto come secondi sarebbe 60× sbagliato).
+- Testo della sezione Impostazioni aggiornato con la spiegazione del perché
+  tenere l'encoder attivo a vuoto è dannoso.
+- La ripresa resta istantanea: `pause()` non ferma il codec, e alla riconnessione
+  `resumeEncoderIfPaused()` + `forceFreshFrame()` riattivano e forzano un frame.
+
+---
+
+## 🚀 1.1.7 — Fix definitivo del video "frizzato" dopo la riconnessione
+
+**Data**: 2026-11-06 · **versionCode**: 1107
+
+### Causa
+`MobileSession.pushFrame()` è una chiamata **bloccante** e veniva invocata
+**sincronamente dal thread di drain dell'encoder**. Quando il TFT sparisce (socket
+ancora aperta ma nessuno che legge) la write TCP resta appesa per minuti: il drain
+non rilascia più i buffer di output del codec, l'encoder si ferma e la pipeline
+**non riparte nemmeno dopo la riconnessione** (il thread resta appeso sulla sessione
+morta). Da qui il video congelato fino al riavvio dell'app.
+
+### Fix
+- Nuova `FrameSender`: thread dedicato + coda limitata (10 frame ≈ 0,3 s).
+  Il drain dell'encoder non si blocca **mai**: se il peer non legge, i frame
+  vengono scartati (con log ogni 300) e il codec continua a girare.
+- A ogni nuova sessione si crea un `FrameSender` nuovo: un thread rimasto appeso
+  su una sessione morta non blocca quella nuova.
+- `stopSession()` (bloccante) spostato su un thread dedicato in `closeSessionOnly()`
+  e `stopInternal()`: non blocca più il thread dei callback Go né la UI ("Chiudi").
+
+---
+
+## 🚀 1.1.6 — Riconnessione in background + Garage + icone header
+
+**Data**: 2026-11-06 · **versionCode**: 1106
+
+### Fix principale: riconnessione automatica con app in background
+- **Causa**: `WifiP2pManager` è "location-gated" da Android 10. Con l'app in background
+  (nessuna Activity visibile) `discoverPeers()`/`connect()` fallivano con `ERROR`, quindi
+  il gruppo Wi-Fi Direct non si ricreava e il TFT non tornava raggiungibile.
+- **Fix**: `ScreenCaptureService` dichiara `foregroundServiceType="mediaProjection|location"`
+  (+ permesso `FOREGROUND_SERVICE_LOCATION`), con fallback automatico a solo
+  `mediaProjection` se il permesso di posizione manca.
+- **Fix**: nuova `HudSession` (vita di processo) che possiede `WifiApController` e
+  `HudStreamController`. Prima `onDispose` della UI faceva `stop()` + `dispose()`,
+  uccidendo il loop di retry P2P se l'Activity veniva distrutta in background.
+- **Fix**: teardown P2P asincrono (`requestGroupInfo` → `removeGroup` solo se il gruppo
+  esiste → attesa esito), `HandlerThread` dedicato, `BUSY` → retry 1,5 s,
+  `ERROR` → log dello stato permessi/GPS.
+- **Fix**: probe TCP di riconnessione da 60 s a 8 s; dopo 3 cicli falliti il livello
+  streaming sollecita il link (`nudge()`) a ricreare il gruppo.
+
+### Fix: video "frizzato" dopo la riconnessione
+- Alla riconnessione `attachMirroring()` usciva subito (encoder e VirtualDisplay già
+  vivi) senza riattivare l'encoder né forzare un frame: il TFT restava sull'ultima
+  immagine finché lo schermo del telefono non cambiava (sembrava servire un tocco).
+- Ora si chiama `resumeEncoderIfPaused()` + `forceFreshFrame()` (resize del
+  VirtualDisplay + `requestSyncFrame`): il TFT si aggiorna subito.
+
+### UI
+- Header sticky unico con logo MotoBit e 3 icone: Home, Moto (Garage), Ingranaggio (Impostazioni).
+- Nuova pagina **Garage** con scheda veicolo e dati del link.
+- Transizioni slide da destra verso sinistra tra le schermate.
+- "Scansiona QR" spostato in basso, fuori dall'header.
+- Nuova sezione **Permessi e affidabilità** in Impostazioni (posizione, GPS, notifiche,
+  batteria) con stato live e pulsante che apre il dialog o la schermata giusta.
+- Nuova icona di lancio (adaptive + tutte le densità).
+- Icona moto come vettoriale locale: rimosso `material-icons-extended` (−50 MB di dex).
+
+---
+
 ## 📋 INCOLLA NEL TERMINALE PER CREARE LO ZIP DI BACKUP
 
 > PowerShell (Terminal di Android Studio va bene). **Cambia solo `$v`** (nome dello zip = versione).

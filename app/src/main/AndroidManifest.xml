@@ -25,7 +25,17 @@
     <uses-permission android:name="android.permission.CAMERA"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE"/>
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_MEDIA_PROJECTION"/>
+    <!--
+        Tipo `location` del foreground service: NON serve alla posizione.
+        Serve a far considerare l'app "in foreground" per le API Wi-Fi Direct
+        (WifiP2pManager e' location-gated da Android 10): senza, con l'app in
+        background discoverPeers()/connect() falliscono con ERROR e il TFT non
+        viene piu' ritrovato dopo uno spegnimento.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
+    <!-- Feedback aptico su connessione/perdita del link (opzionale) -->
+    <uses-permission android:name="android.permission.VIBRATE"/>
 
     <!-- Usato solo dal dialog di sistema per escludere l'app dal Doze -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
@@ -44,7 +54,29 @@
             android:name="com.nos.motobitride.core.hud.ScreenCaptureService"
             android:enabled="true"
             android:exported="false"
-            android:foregroundServiceType="mediaProjection" />
+            android:foregroundServiceType="mediaProjection|location" />
+
+        <!-- Azioni della notifica di mirroring (Stop / Riconnetti) -->
+        <receiver
+            android:name="com.nos.motobitride.core.hud.NotificationActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.nos.motobitride.action.STOP" />
+                <action android:name="com.nos.motobitride.action.RECONNECT" />
+            </intent-filter>
+        </receiver>
+
+        <!-- Azioni della notifica di scadenza (Posponi / Elimina) -->
+        <receiver
+            android:name="com.nos.motobitride.core.garage.DeadlineActionReceiver"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="com.nos.motobitride.action.DEADLINE_SNOOZE" />
+                <action android:name="com.nos.motobitride.action.DEADLINE_DISMISS" />
+            </intent-filter>
+        </receiver>
 
         <activity
             android:name=".MainActivity"

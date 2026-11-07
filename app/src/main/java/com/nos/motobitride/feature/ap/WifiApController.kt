@@ -7,9 +7,11 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.net.MacAddress
 import android.net.wifi.p2p.WifiP2pConfig
+import android.net.wifi.p2p.WifiP2pGroup
 import android.net.wifi.p2p.WifiP2pInfo
 import android.net.wifi.p2p.WifiP2pManager
 import android.os.Handler
+import android.os.HandlerThread
 import android.os.Looper
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -18,6 +20,7 @@ import androidx.core.content.ContextCompat
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.qr.QrContent
+import com.nos.motobitride.core.settings.PermissionsHelper
 
 /**
  * Link verso l'HU tramite **Wi-Fi Direct**.
@@ -32,6 +35,19 @@ import com.nos.motobitride.core.qr.QrContent
  * dell'ultimo QR, finche' l'utente non chiama [disconnect]/[dispose].
  * Cosi' riaccendendo il TFT la connessione torna senza toccare nulla e senza
  * perdere la MediaProjection lato streaming.
+ *
+ * ## Perche' serve il foreground service di tipo `location`
+ * Da Android 10 `WifiP2pManager` e' un'API "location-gated": con l'app in
+ * background (nessuna Activity visibile) `discoverPeers()`/`connect()` vengono
+ * rifiutate con `ERROR` a meno che l'app non abbia un foreground service di
+ * tipo `location` (o il permesso di posizione in background). Il servizio di
+ * cattura schermo dichiara `mediaProjection|location` proprio per questo.
+ *
+ * ## Perche' la sequenza di teardown e' asincrona
+ * `removeGroup()` su un gruppo inesistente restituisce `BUSY` e lascia la
+ * macchina a stati occupata; chiamare `connect()` prima che il teardown sia
+ * concluso restituisce `BUSY` a sua volta. Per questo si interroga
+ * `requestGroupInfo()` e si attende l'esito prima di riconnettere.
  */
 class WifiApController internal constructor(
     private val context: Context,
@@ -45,7 +61,12 @@ class WifiApController internal constructor(
     var hudIp: String? = null
         private set
 
-    var lastEvent: String = ""
+    /**
+     * Stato del link, **osservabile** dalla UI: prima era un `var` semplice,
+     * quindi la schermata non si aggiornava e l'utente vedeva "non succede
+     * nulla" anche quando il tentativo era in corso.
+     */
+    var lastEvent by mutableStateOf("")
         private set
 
     private var p2pManager: WifiP2pManager? = null
@@ -61,11 +82,30 @@ class WifiApController internal constructor(
     private val handler = Handler(Looper.getMainLooper())
     private var retryRunnable: Runnable? = null
 
+    /**
+     * Looper dedicato alle chiamate P2P: le API Wi-Fi Direct non sono
+     * rientranti e il main looper e' condiviso con la UI. Un thread proprio
+     * serializza initialize/connect/removeGroup e riduce i `BUSY` intermittenti.
+     */
+    private val p2pThread = HandlerThread("motobit-p2p").apply { start() }
+    private val p2pHandler = Handler(p2pThread.looper)
+
     /** Runnable del lookup peer: va annullato se il tentativo viene rifatto. */
     private var peerLookupRunnable: Runnable? = null
 
     /** Vero mentre un tentativo e' in corso (connect inviato, gruppo non ancora pronto). */
     private var attemptInFlight = false
+
+    /** Inizio del tentativo in corso: serve a sbloccare un tentativo appeso. */
+    private var attemptStartedAt = 0L
+
+    /**
+     * Ascolto passivo: scaduta l'"attesa attiva" non si arma piu' il timer di
+     * retry. Il receiver resta registrato, quindi al ritorno del peer
+     * (`PEERS_CHANGED`) la riconnessione avviene comunque.
+     */
+    @Volatile
+    private var passiveWait = false
 
     // ------------------------------------------------------------------
     // API
@@ -77,9 +117,20 @@ class WifiApController internal constructor(
         // corso (visto in log: secondo "Avvia" che azzera il primo tentativo).
         val sameCredentials = savedQr?.ssid == qr.ssid && savedQr?.mac == qr.mac
         if (sameCredentials && (isHudConnected || attemptInFlight)) {
-            lastEvent = if (isHudConnected) "link gia' attivo" else "tentativo in corso"
-            AppLog.i(TAG, "connect(${qr.ssid}) ignorato: $lastEvent")
-            return
+            // Se il tentativo e' appeso da troppo, il tocco dell'utente lo sblocca:
+            // aspettare oltre significa mostrare un tasto che non risponde.
+            val stuck = attemptInFlight &&
+                    (System.currentTimeMillis() - attemptStartedAt) > ATTEMPT_STUCK_MS
+            if (isHudConnected || !stuck) {
+                lastEvent = if (isHudConnected) "link gia' attivo" else "tentativo in corso"
+                AppLog.i(TAG, "connect(${qr.ssid}) ignorato: $lastEvent")
+                return
+            }
+            AppLog.w(
+                TAG,
+                "tentativo appeso da oltre ${ATTEMPT_STUCK_MS / 1000}s: ne avvio uno nuovo"
+            )
+            attemptInFlight = false
         }
 
         savedQr = qr
@@ -95,6 +146,21 @@ class WifiApController internal constructor(
         val qr = savedQr ?: return false
         connect(qr)
         return true
+    }
+
+    /**
+     * Sollecitazione esterna (dal livello streaming): il link risulta fermo da
+     * piu' cicli, quindi si forza subito un nuovo tentativo azzerando il backoff.
+     * Non fa nulla se un tentativo e' gia' in corso o se il link e' attivo.
+     */
+    fun nudge(reason: String = "sollecitazione esterna") {
+        if (!autoRetryEnabled) return
+        if (isHudConnected || attemptInFlight) return
+        val qr = savedQr ?: return
+        AppLog.w(TAG, "nudge: nuovo tentativo immediato ($reason)")
+        cancelPendingRetry()
+        retryDelayMs = RETRY_MIN_DELAY_MS
+        startAttempt(qr, firstAttempt = false)
     }
 
     fun disconnect() {
@@ -114,6 +180,7 @@ class WifiApController internal constructor(
 
     fun dispose() {
         disconnect()
+        runCatching { p2pThread.quitSafely() }
     }
 
     // ------------------------------------------------------------------
@@ -121,8 +188,8 @@ class WifiApController internal constructor(
     // ------------------------------------------------------------------
 
     private fun startAttempt(qr: QrContent.HudWifi, firstAttempt: Boolean) {
-        teardownP2p()
         attemptInFlight = true
+        attemptStartedAt = System.currentTimeMillis()
 
         if (firstAttempt) {
             lastEvent = "connessione P2P"
@@ -131,6 +198,15 @@ class WifiApController internal constructor(
             AppLog.i(TAG, "Nuovo tentativo P2P verso ${qr.ssid} (tentativo $retryAttempt)")
         }
 
+        // Teardown IMMEDIATO (fire-and-forget), come nel comportamento originale:
+        // attendere il callback di requestGroupInfo/removeGroup introduceva fino a
+        // 2 secondi di silenzio dopo il tocco su "Avvia".
+        teardownP2p()
+        beginP2p(qr)
+    }
+
+    @SuppressLint("MissingPermission")
+    private fun beginP2p(qr: QrContent.HudWifi) {
         try {
             val manager = context.getSystemService(Context.WIFI_P2P_SERVICE)
                     as? WifiP2pManager
@@ -146,8 +222,13 @@ class WifiApController internal constructor(
             p2pManager = manager
 
             // ChannelListener.onChannelDisconnected() non ha parametri
-            val channel = manager.initialize(context, Looper.getMainLooper()) {
+            val channel = manager.initialize(context, p2pThread.looper) {
                 AppLog.w(TAG, "canale Wi-Fi Direct disconnesso")
+                // Canale morto: va ricreato. Si azzera qui, cosi' il retry
+                // passivo capisce che serve una nuova initialize.
+                p2pChannel = null
+                p2pManager = null
+                attemptInFlight = false
                 scheduleRetry("canale disconnesso")
             }
             if (channel == null) {
@@ -174,27 +255,80 @@ class WifiApController internal constructor(
         }
     }
 
-    private fun scheduleRetry(reason: String) {
+    /** Attiva/disattiva l'ascolto passivo (nessun timer, solo receiver in ascolto). */
+    fun setPassiveWait(enabled: Boolean) {
+        if (passiveWait == enabled) return
+        passiveWait = enabled
+        if (enabled) {
+            cancelPendingRetry()
+            AppLog.i(TAG, "Link in ascolto passivo: nessun tentativo programmato")
+        } else {
+            AppLog.i(TAG, "Link: riprende l'attesa attiva")
+        }
+    }
+
+    private fun scheduleRetry(reason: String, overrideDelayMs: Long? = null) {
         if (!autoRetryEnabled || savedQr == null || retryPending) return
+        if (passiveWait) {
+            AppLog.i(TAG, "Ascolto passivo: retry non programmato ($reason)")
+            return
+        }
 
         retryPending = true
         retryAttempt++
-        val delay = retryDelayMs
+        val delay = overrideDelayMs ?: retryDelayMs
 
         AppLog.w(TAG, "Retry P2P #$retryAttempt tra ${delay} ms ($reason)")
         lastEvent = "retry #$retryAttempt ($reason)"
 
-        retryDelayMs = (retryDelayMs * 2).coerceAtMost(RETRY_MAX_DELAY_MS)
+        if (overrideDelayMs == null) {
+            retryDelayMs = (retryDelayMs * 2).coerceAtMost(RETRY_MAX_DELAY_MS)
+        }
 
         val runnable = Runnable {
             retryPending = false
             retryRunnable = null
             if (!autoRetryEnabled) return@Runnable
             val qr = savedQr ?: return@Runnable
-            startAttempt(qr, firstAttempt = false)
+            retryPassive(qr)
         }
         retryRunnable = runnable
         handler.postDelayed(runnable, delay)
+    }
+
+    /**
+     * Recupero **passivo**: non distrugge il gruppo e non ricrea il canale.
+     *
+     * Prima ogni tentativo (ogni 3-10 s) eseguiva `removeGroup` + `initialize`
+     * + `connect`, martellando lo stack Wi-Fi Direct mentre il peer era assente:
+     * `removeGroup` su un gruppo gia' inesistente restituisce `BUSY` e lascia la
+     * macchina a stati occupata, facendo fallire il `connect` successivo.
+     *
+     * Ora si riusa il canale esistente e si tenta solo la connessione. La
+     * reinizializzazione avviene **solo** se il canale e' davvero morto
+     * (Wi-Fi Direct disattivato, `onChannelDisconnected`).
+     */
+    private fun retryPassive(qr: QrContent.HudWifi) {
+        if (isHudConnected || attemptInFlight) return
+
+        val manager = p2pManager
+        val channel = p2pChannel
+        if (manager == null || channel == null) {
+            AppLog.w(TAG, "retry passivo: canale assente, serve una nuova initialize")
+            startAttempt(qr, firstAttempt = false)
+            return
+        }
+
+        attemptInFlight = true
+        attemptStartedAt = System.currentTimeMillis()
+        val mac = qr.mac
+        if (!mac.isNullOrBlank()) {
+            AppLog.i(TAG, "retry passivo: connect diretto a $mac (nessun teardown)")
+            connectToPeer(manager, channel, mac, qr)
+        } else {
+            AppLog.i(TAG, "retry passivo: MAC assente, discovery")
+            discoverAndConnect(manager, channel, qr)
+        }
     }
 
     private fun cancelPendingRetry() {
@@ -224,7 +358,7 @@ class WifiApController internal constructor(
             override fun onFailure(reason: Int) {
                 AppLog.e(TAG, "discoverPeers fallita: ${reasonText(reason)}")
                 lastEvent = "P2P discovery fallita (${reasonText(reason)})"
-                scheduleRetry("discovery fallita")
+                handleP2pFailure("discovery fallita", reason)
             }
         })
 
@@ -323,9 +457,40 @@ class WifiApController internal constructor(
             override fun onFailure(reason: Int) {
                 AppLog.e(TAG, "connect fallita: ${reasonText(reason)}")
                 lastEvent = "P2P connect fallita (${reasonText(reason)})"
-                scheduleRetry("connect fallita (${reasonText(reason)})")
+                handleP2pFailure("connect fallita (${reasonText(reason)})", reason)
             }
         })
+    }
+
+    /**
+     * Distingue i due fallimenti che contano:
+     *  - `BUSY`: la macchina a stati e' occupata (teardown/negoziazione in corso).
+     *    Si riprova SUBITO dopo poco, senza bruciare il backoff lungo.
+     *  - `ERROR`: quasi sempre permesso di posizione mancante, posizione di
+     *    sistema spenta, oppure app in background senza foreground service di
+     *    tipo `location`. Si logga lo stato reale per capirlo dal log.
+     */
+    private fun handleP2pFailure(reason: String, code: Int) {
+        // Il tentativo e' concluso (male): senza questo la guardia di
+        // `retryPassive` bloccherebbe ogni tentativo successivo.
+        attemptInFlight = false
+
+        when (code) {
+            WifiP2pManager.BUSY -> {
+                AppLog.w(TAG, "P2P occupato (BUSY): nuovo tentativo tra ${RETRY_BUSY_DELAY_MS} ms")
+                scheduleRetry(reason, overrideDelayMs = RETRY_BUSY_DELAY_MS)
+            }
+
+            WifiP2pManager.ERROR -> {
+                AppLog.e(
+                    TAG,
+                    "P2P ERROR: stato permessi -> ${PermissionsHelper.describe(context)}"
+                )
+                scheduleRetry(reason)
+            }
+
+            else -> scheduleRetry(reason)
+        }
     }
 
     @SuppressLint("MissingPermission")
@@ -350,6 +515,14 @@ class WifiApController internal constructor(
                         peerLookupRunnable?.let {
                             handler.removeCallbacks(it)
                             it.run()
+                        }
+                        // Fast path del recupero passivo: se il peer e' tornato
+                        // si tenta subito un connect, senza aspettare il timer
+                        // e senza distruggere nulla.
+                        if (!isHudConnected && !attemptInFlight && autoRetryEnabled) {
+                            savedQr?.let { qr ->
+                                handler.post { retryPassive(qr) }
+                            }
                         }
                     }
 
@@ -420,6 +593,16 @@ class WifiApController internal constructor(
         }
     }
 
+    /**
+     * Rimuove il gruppo P2P **senza attendere**: `removeGroup` in
+     * fire-and-forget, come nel comportamento originale.
+     *
+     * L'attesa del callback di `requestGroupInfo`/`removeGroup` (introdotta in
+     * 1.1.6) aggiungeva fino a **2 secondi** di silenzio dopo il tocco su
+     * "Avvia": percepito dall'utente come tasto che non risponde. Il rischio
+     * di `BUSY` e' gestito dal retry, non dall'attesa.
+     */
+    @SuppressLint("MissingPermission")
     private fun teardownP2p() {
         // Il lookup del tentativo precedente non deve piu' agire: altrimenti
         // rieseguirebbe un connect sui campi del tentativo nuovo.
@@ -458,6 +641,7 @@ class WifiApController internal constructor(
         // appena formato. (Annulla anche retryAttempt e retryDelayMs.)
         cancelPendingRetry()
         attemptInFlight = false
+        passiveWait = false
 
         if (isHudConnected && hudIp == ip) return
         isHudConnected = true
@@ -501,5 +685,14 @@ class WifiApController internal constructor(
         // Retry del gruppo P2P: da 3 s a 10 s, illimitati finche' non si ferma.
         private const val RETRY_MIN_DELAY_MS = 3_000L
         private const val RETRY_MAX_DELAY_MS = 10_000L
+
+        /** BUSY = macchina a stati occupata: si riprova subito, senza backoff. */
+        private const val RETRY_BUSY_DELAY_MS = 1_500L
+
+        /**
+         * Oltre questa soglia un tentativo e' considerato appeso: il tocco su
+         * "Avvia" sblocca la situazione invece di essere ignorato.
+         */
+        private const val ATTEMPT_STUCK_MS = 5_000L
     }
 }

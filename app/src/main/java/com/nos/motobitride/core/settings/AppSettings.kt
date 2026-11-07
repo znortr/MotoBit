@@ -27,15 +27,36 @@ object AppSettings {
     private const val TAG = "AppSettings"
     private const val FILE = "motobit_settings"
     private const val KEY_STARTUP = "startup_behavior"
-    private const val KEY_ENCODER_IDLE_MIN = "encoder_idle_timeout_min"
+    // Chiave nuova: "attesa attiva" in MINUTI. Le vecchie chiavi
+    // (encoder_idle_timeout_min / _sec) restano ignorate di proposito.
+    private const val KEY_ACTIVE_WAIT_MIN = "active_wait_min"
+    private const val KEY_VIBRATE_ON_CONNECT = "vibrate_on_connect"
+    private const val KEY_NOTIFICATIONS_ENABLED = "notifications_enabled"
+    private const val KEY_DAYS_BEFORE = "deadline_days_before"
     private const val KEY_CLOCK_PUSH_COUNT = "clock_push_count"
     private const val KEY_DIAG_LOG = "diag_log_enabled"
     private const val KEY_LANGUAGE = "app_language"
     private const val KEY_THEME_MODE = "app_theme_mode"
     private const val KEY_PERIODIC_KEEPALIVE = "periodic_clock_keepalive"
 
-    /** Default dell'attesa prima di sospendere l'encoding. */
-    const val DEFAULT_ENCODER_IDLE_MINUTES = 5
+    /**
+     * Default dell'"attesa attiva": per quanti minuti l'app tenta attivamente
+     * la riconnessione prima di passare in ascolto passivo.
+     *
+     * Durante l'attesa attiva: encoder in pausa dopo 5 s (interno) e retry P2P
+     * ogni 3-10 s. Oltre la soglia: nessun tentativo, solo il receiver
+     * `PEERS_CHANGED` in ascolto (la riconnessione resta automatica).
+     */
+    const val DEFAULT_ACTIVE_WAIT_MINUTES = 5
+
+    /** Vibrazione breve su connessione/perdita del link (default OFF). */
+    const val DEFAULT_VIBRATE_ON_CONNECT = false
+
+    /** Notifiche di scadenza (revisione/tassa/assicurazione): default ON. */
+    const val DEFAULT_NOTIFICATIONS_ENABLED = true
+
+    /** Quanti giorni prima avvisare della scadenza. */
+    const val DEFAULT_DAYS_BEFORE = 7
 
     /**
      * Default del numero di push della raffica iniziale dell'ora verso il
@@ -72,11 +93,22 @@ object AppSettings {
     val themeMode: StateFlow<AppThemeMode> = _themeMode.asStateFlow()
 
     /**
-     * Minuti di attesa dell'HU prima di mettere l'encoder in pausa.
-     * 0 = non sospendere mai.
+     * Minuti di attesa attiva prima di passare in ascolto passivo.
      */
-    private val _encoderIdleMinutes = MutableStateFlow(DEFAULT_ENCODER_IDLE_MINUTES)
-    val encoderIdleMinutes: StateFlow<Int> = _encoderIdleMinutes.asStateFlow()
+    private val _activeWaitMinutes = MutableStateFlow(DEFAULT_ACTIVE_WAIT_MINUTES)
+    val activeWaitMinutes: StateFlow<Int> = _activeWaitMinutes.asStateFlow()
+
+    /** Vibrazione breve su connessione/perdita del link. */
+    private val _vibrateOnConnect = MutableStateFlow(DEFAULT_VIBRATE_ON_CONNECT)
+    val vibrateOnConnect: StateFlow<Boolean> = _vibrateOnConnect.asStateFlow()
+
+    /** Interruttore generale delle notifiche di scadenza. */
+    private val _notificationsEnabled = MutableStateFlow(DEFAULT_NOTIFICATIONS_ENABLED)
+    val notificationsEnabled: StateFlow<Boolean> = _notificationsEnabled.asStateFlow()
+
+    /** Giorni di preavviso per le scadenze. */
+    private val _daysBefore = MutableStateFlow(DEFAULT_DAYS_BEFORE)
+    val daysBefore: StateFlow<Int> = _daysBefore.asStateFlow()
 
     fun init(context: Context) {
         if (prefs != null) return
@@ -85,10 +117,22 @@ object AppSettings {
         _startup.value = StartupBehavior.fromStored(p.getString(KEY_STARTUP, null))
         _language.value = AppLanguage.fromCode(p.getString(KEY_LANGUAGE, "it"))
         _themeMode.value = AppThemeMode.fromCode(p.getString(KEY_THEME_MODE, "dark"))
-        _encoderIdleMinutes.value = p.getInt(
-            KEY_ENCODER_IDLE_MIN,
-            DEFAULT_ENCODER_IDLE_MINUTES
-        ).coerceIn(MIN_ENCODER_IDLE_MINUTES, MAX_ENCODER_IDLE_MINUTES)
+        _activeWaitMinutes.value = p.getInt(
+            KEY_ACTIVE_WAIT_MIN,
+            DEFAULT_ACTIVE_WAIT_MINUTES
+        ).coerceIn(MIN_ACTIVE_WAIT_MINUTES, MAX_ACTIVE_WAIT_MINUTES)
+        _vibrateOnConnect.value = p.getBoolean(
+            KEY_VIBRATE_ON_CONNECT,
+            DEFAULT_VIBRATE_ON_CONNECT
+        )
+        _notificationsEnabled.value = p.getBoolean(
+            KEY_NOTIFICATIONS_ENABLED,
+            DEFAULT_NOTIFICATIONS_ENABLED
+        )
+        _daysBefore.value = p.getInt(
+            KEY_DAYS_BEFORE,
+            DEFAULT_DAYS_BEFORE
+        ).coerceIn(MIN_DAYS_BEFORE, MAX_DAYS_BEFORE)
         _clockPushCount.value = p.getInt(
             KEY_CLOCK_PUSH_COUNT,
             DEFAULT_CLOCK_PUSH_COUNT
@@ -105,7 +149,7 @@ object AppSettings {
         AppLog.i(TAG, "Lingua app: ${_language.value.code} (${_language.value.nameNative})")
         AppLog.i(TAG, "Tema app: ${_themeMode.value.code}")
         AppLog.i(TAG, "Comportamento avvio: ${_startup.value.name}")
-        AppLog.i(TAG, "Sospensione encoder dopo: ${_encoderIdleMinutes.value} min")
+        AppLog.i(TAG, "Attesa attiva: ${_activeWaitMinutes.value} min")
         AppLog.i(TAG, "Push orologio all'avvio: ${_clockPushCount.value}")
         AppLog.i(TAG, "Keepalive orologio periodico (5 min): ${if (_periodicClockKeepalive.value) "ON" else "OFF"}")
         AppLog.i(TAG, "Log diagnostica: ${if (diagEnabled) "ON" else "OFF"}")
@@ -123,11 +167,30 @@ object AppSettings {
         AppLog.i(TAG, "Tema impostato -> ${mode.code}")
     }
 
-    fun setEncoderIdleMinutes(minutes: Int) {
-        val clamped = minutes.coerceIn(MIN_ENCODER_IDLE_MINUTES, MAX_ENCODER_IDLE_MINUTES)
-        _encoderIdleMinutes.value = clamped
-        prefs?.edit()?.putInt(KEY_ENCODER_IDLE_MIN, clamped)?.apply()
-        AppLog.i(TAG, "Sospensione encoder -> $clamped min")
+    fun setActiveWaitMinutes(minutes: Int) {
+        val clamped = minutes.coerceIn(MIN_ACTIVE_WAIT_MINUTES, MAX_ACTIVE_WAIT_MINUTES)
+        _activeWaitMinutes.value = clamped
+        prefs?.edit()?.putInt(KEY_ACTIVE_WAIT_MIN, clamped)?.apply()
+        AppLog.i(TAG, "Attesa attiva -> $clamped min")
+    }
+
+    fun setVibrateOnConnect(enabled: Boolean) {
+        _vibrateOnConnect.value = enabled
+        prefs?.edit()?.putBoolean(KEY_VIBRATE_ON_CONNECT, enabled)?.apply()
+        AppLog.i(TAG, "Vibrazione su connessione -> ${if (enabled) "ON" else "OFF"}")
+    }
+
+    fun setNotificationsEnabled(enabled: Boolean) {
+        _notificationsEnabled.value = enabled
+        prefs?.edit()?.putBoolean(KEY_NOTIFICATIONS_ENABLED, enabled)?.apply()
+        AppLog.i(TAG, "Notifiche scadenze -> ${if (enabled) "ON" else "OFF"}")
+    }
+
+    fun setDaysBefore(days: Int) {
+        val clamped = days.coerceIn(MIN_DAYS_BEFORE, MAX_DAYS_BEFORE)
+        _daysBefore.value = clamped
+        prefs?.edit()?.putInt(KEY_DAYS_BEFORE, clamped)?.apply()
+        AppLog.i(TAG, "Preavviso scadenze -> $clamped giorni")
     }
 
     fun setStartup(behavior: StartupBehavior) {
@@ -174,6 +237,9 @@ object AppSettings {
         AppLog.i(TAG, "Log diagnostica -> ${if (enabled) "ON" else "OFF"}")
     }
 
-    const val MIN_ENCODER_IDLE_MINUTES = 0
-    const val MAX_ENCODER_IDLE_MINUTES = 30
+    const val MIN_ACTIVE_WAIT_MINUTES = 1
+    const val MAX_ACTIVE_WAIT_MINUTES = 30
+
+    const val MIN_DAYS_BEFORE = 1
+    const val MAX_DAYS_BEFORE = 60
 }

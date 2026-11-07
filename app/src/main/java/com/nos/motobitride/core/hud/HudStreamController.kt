@@ -132,6 +132,56 @@ class HudStreamController(
     @Volatile
     private var preferredHostPort: Int = DEFAULT_HUD_PORT
 
+    /**
+     * Sollecitazione verso il livello link: dopo [LINK_STALL_THRESHOLD] cicli di
+     * probe falliti consecutivi il gruppo P2P e' probabilmente morto e va
+     * ricreato (il solo probe TCP non lo puo' fare).
+     */
+    @Volatile
+    var onLinkStalled: (() -> Unit)? = null
+
+    /** Cicli di probe consecutivi falliti: azzerato appena l'HU risponde. */
+    @Volatile
+    private var consecutiveProbeFailures = 0
+
+    /**
+     * Ascolto passivo: scaduta l'"attesa attiva" non si arma piu' nessun
+     * tentativo. Il receiver del link resta in ascolto, quindi alla
+     * riaccensione del TFT la riconnessione avviene comunque.
+     */
+    @Volatile
+    private var passiveWait = false
+
+    /** Runnable del prossimo tentativo, per poterlo annullare al ritorno del link. */
+    private var reconnectRunnable: Runnable? = null
+
+    /** Vero mentre un thread di probe TCP e' in corso (evita probe duplicati). */
+    @Volatile
+    private var probeInFlight = false
+
+    /**
+     * Vero mentre un handshake (`connectToHost`) e' in corso.
+     *
+     * Senza questa guardia, una sollecitazione esterna (`onLinkRestored`) che
+     * arriva durante l'handshake faceva partire un SECONDO `connectToHost`:
+     * due `MobileSession` concorrenti sullo stesso HU, una orfana. L'HU chiude
+     * la piu' vecchia e lo streaming entra in un ciclo di riconnessioni che il
+     * TFT vede come immagine intermittente.
+     */
+    @Volatile
+    private var connecting = false
+
+    /** Momento in cui e' iniziato l'handshake corrente (per la guardia anti-blocco). */
+    @Volatile
+    private var connectingSince = 0L
+
+    /**
+     * Handshake considerato bloccato oltre questa soglia: la guardia si
+     * auto-ripara invece di impedire per sempre nuove riconnessioni.
+     */
+    private fun isConnecting(): Boolean =
+        connecting && (System.currentTimeMillis() - connectingSince) < CONNECT_STUCK_MS
+
     private var mirrorAttempts = 0
     private var watchdogActive = false
 
@@ -188,8 +238,8 @@ class HudStreamController(
         enc.pause()
         AppLog.i(
             TAG,
-            "In attesa da ${encoderIdleTimeoutMs / 60_000L} min: " +
-                    "encoding sospeso per risparmio batteria"
+            "In attesa da ${encoderIdleTimeoutMs / 1_000L} s: " +
+                    "encoding sospeso (CPU libera per le altre app)"
         )
     }
 
@@ -573,7 +623,12 @@ class HudStreamController(
                     mediaProjection = null
                     if (isRunning) {
                         _state.value = StreamState.AWAITING_PROJECTION
-                        _status.value = "Cattura schermo revocata: riavvia la trasmissione"
+                        // Su Android 14+ il consenso puo' essere chiesto solo con
+                        // l'app visibile: se la revoca arriva in background il
+                        // flusso resta fermo finche' l'utente non riapre l'app.
+                        // Il messaggio finisce anche nella notifica.
+                        _status.value =
+                            "Cattura schermo revocata: riapri MotoBit per riprendere"
                         AppLog.w(TAG, "Serve un nuovo consenso alla cattura schermo")
                     }
                 }
@@ -599,31 +654,54 @@ class HudStreamController(
 
     private fun beginDiscovery() {
         if (stopRequested) return
+        if (isConnecting()) {
+            AppLog.i(TAG, "Handshake gia' in corso: salto la discovery")
+            return
+        }
         _state.value = StreamState.DISCOVERING
 
         // Se il livello link conosce gia' l'IP dell'HU, saltiamo mDNS.
         val knownIp = preferredHostIp
         if (knownIp != null) {
+            if (probeInFlight) {
+                AppLog.i(TAG, "Probe gia' in corso: ignoro la richiesta")
+                return
+            }
+            probeInFlight = true
             _status.value = "Connessione a $knownIp (dal link Wi-Fi)"
             AppLog.i(TAG, "Uso host dal link: $knownIp:$preferredHostPort")
             Thread {
-                // PROBE: l'HU accetta l'handshake solo quando il suo server e'
-                // pronto. Una connect TCP da 700 ms lo dice subito; il dial cieco
-                // della libreria costa 5-10 s a tentativo (visto in log).
-                if (!waitForHudPort(knownIp, preferredHostPort)) {
-                    scheduleReconnect("porta $knownIp:$preferredHostPort chiusa")
-                    return@Thread
-                }
                 try {
-                    val host = Api.newStreamHost(
-                        knownIp,
-                        preferredHostPort.toString(),
-                        expectedPackageName
-                    )
-                    connectToHost(host)
-                } catch (t: Throwable) {
-                    AppLog.e(TAG, "Host dal link non valido", t)
-                    scheduleReconnect("host dal link non valido: ${t.message}")
+                    // PROBE: l'HU accetta l'handshake solo quando il suo server e'
+                    // pronto. Una connect TCP da 700 ms lo dice subito; il dial cieco
+                    // della libreria costa 5-10 s a tentativo (visto in log).
+                    if (!waitForHudPort(knownIp, preferredHostPort)) {
+                        consecutiveProbeFailures++
+                        if (consecutiveProbeFailures >= LINK_STALL_THRESHOLD) {
+                            consecutiveProbeFailures = 0
+                            AppLog.w(
+                                TAG,
+                                "Link fermo da $LINK_STALL_THRESHOLD cicli: chiedo al link di ricreare il gruppo P2P"
+                            )
+                            onLinkStalled?.invoke()
+                        }
+                        scheduleReconnect("porta $knownIp:$preferredHostPort chiusa")
+                        return@Thread
+                    }
+                    consecutiveProbeFailures = 0
+                    try {
+                        val host = Api.newStreamHost(
+                            knownIp,
+                            preferredHostPort.toString(),
+                            expectedPackageName
+                        )
+                        connectToHost(host)
+                    } catch (t: Throwable) {
+                        AppLog.e(TAG, "Host dal link non valido", t)
+                        scheduleReconnect("host dal link non valido: ${t.message}")
+                    }
+                } finally {
+                    probeInFlight = false
                 }
             }.start()
             return
@@ -680,6 +758,27 @@ class HudStreamController(
     }
 
     private fun connectToHost(host: StreamHost) {
+        if (isConnecting()) {
+            AppLog.i(TAG, "Handshake gia' in corso: ignoro la nuova richiesta")
+            return
+        }
+        if (connecting) {
+            AppLog.w(
+                TAG,
+                "Handshake precedente bloccato da oltre ${CONNECT_STUCK_MS / 1000}s: lo considero caduto"
+            )
+        }
+        connecting = true
+        connectingSince = System.currentTimeMillis()
+        try {
+            connectToHostInternal(host)
+        } finally {
+            connecting = false
+            connectingSince = 0L
+        }
+    }
+
+    private fun connectToHostInternal(host: StreamHost) {
         _state.value = StreamState.CONNECTING
         _status.value = "Connessione all'HUD..."
         AppLog.i(TAG, "Handshake sessione HUD in corso...")
@@ -802,7 +901,18 @@ class HudStreamController(
         AppLog.i(TAG, "Sessione HUD pronta in ${elapsed} ms")
 
         if (pendingSession === session) pendingSession = null
+
+        // Sicurezza: se esistesse ancora una sessione precedente, va chiusa.
+        // Due sessioni vive sullo stesso HU vengono percepite dal TFT come
+        // immagine intermittente (alterna i frame delle due).
+        mobileSession?.let { old ->
+            if (old !== session) {
+                AppLog.w(TAG, "Sessione precedente ancora viva: la chiudo prima della nuova")
+                runCatching { old.stopSession() }
+            }
+        }
         mobileSession = session
+
         isRunning = true
         mirrorAttempts = 0
         reconnectAttempt = 0
@@ -815,6 +925,11 @@ class HudStreamController(
             _status.value = "Consenti la cattura schermo"
             AppLog.i(TAG, "In attesa del consenso alla cattura schermo")
         } else if (attachMirroring()) {
+            // Riconnessione: l'encoder puo' essere in pausa (timeout di attesa
+            // scaduto) e il VirtualDisplay non ha prodotto frame durante il down.
+            // Senza questo il TFT resta sull'immagine stantia finche' lo schermo
+            // del telefono non cambia (sembra "frizzato" fino al primo tocco).
+            resumeEncoderIfPaused()
             _state.value = StreamState.MIRRORING
             _status.value = "Mirroring ${videoWidth}x${videoHeight}"
             AppLog.i(TAG, "Video ripristinato sulla nuova sessione")
@@ -856,6 +971,14 @@ class HudStreamController(
             if (mobileSession != null || pendingSession != null) closeSessionOnly()
             return
         }
+
+        if (passiveWait) {
+            // Attesa attiva scaduta: nessun tentativo. Il link resta in ascolto
+            // e al ritorno del peer chiamera' onLinkRestored().
+            AppLog.i(TAG, "Ascolto passivo: nessun tentativo ($reason)")
+            if (mobileSession != null || pendingSession != null) closeSessionOnly()
+            return
+        }
         if (reconnectPending) {
             AppLog.i(TAG, "Riconnessione gia' in corso, ignoro: $reason")
             return
@@ -884,11 +1007,60 @@ class HudStreamController(
 
         armEncoderIdleTimer()
 
-        mainHandler.postDelayed({
+        val runnable = Runnable {
             reconnectPending = false
-            if (stopRequested) return@postDelayed
+            reconnectRunnable = null
+            if (stopRequested) return@Runnable
             beginDiscovery()
-        }, delay)
+        }
+        reconnectRunnable = runnable
+        mainHandler.postDelayed(runnable, delay)
+    }
+
+    /**
+     * Il link Wi-Fi Direct e' tornato (peer riapparso).
+     *
+     * Azzera il backoff e fa partire **subito** la riconnessione, invece di
+     * aspettare il timer (che nel frattempo puo' essere arrivato a 10 s).
+     * È la correzione principale della riconnessione lenta (20-30 s).
+     */
+    fun onLinkRestored(autoResume: Boolean) {
+        if (stopRequested || streamPaused) return
+
+        passiveWait = false
+        reconnectRunnable?.let { mainHandler.removeCallbacks(it) }
+        reconnectRunnable = null
+        reconnectPending = false
+        reconnectAttempt = 0
+        reconnectDelayMs = RECONNECT_MIN_DELAY_MS
+
+        if (isRunning) return // sessione gia' viva: nulla da fare
+        if (isConnecting()) {
+            AppLog.i(TAG, "Link tornato: handshake gia' in corso, non ne avvio un altro")
+            return
+        }
+        if (!autoResume) {
+            AppLog.i(TAG, "Link tornato: backoff azzerato (video non richiesto)")
+            return
+        }
+
+        AppLog.i(TAG, "Link tornato: riconnessione immediata (backoff azzerato)")
+        _status.value = "Link tornato: connessione all'HUD..."
+        beginDiscovery()
+    }
+
+    /** Attiva/disattiva l'ascolto passivo (nessun tentativo, solo attesa del peer). */
+    fun setPassiveWait(enabled: Boolean) {
+        if (passiveWait == enabled) return
+        passiveWait = enabled
+        if (enabled) {
+            reconnectRunnable?.let { mainHandler.removeCallbacks(it) }
+            reconnectRunnable = null
+            reconnectPending = false
+            AppLog.i(TAG, "Passaggio in ascolto passivo")
+        } else {
+            AppLog.i(TAG, "Uscita dall'ascolto passivo")
+        }
     }
 
     /**
@@ -900,17 +1072,19 @@ class HudStreamController(
         if (_state.value != StreamState.WAITING_HUD) return
         if (encoderIdleTimerPending || encoderPaused) return
         val timeout = encoderIdleTimeoutMs
-        if (timeout <= 0L) return // 0 = non sospendere mai
 
         encoderIdleTimerPending = true
-        mainHandler.postDelayed(pauseEncoderRunnable, timeout)
+        // timeout <= 0 => nessuna grazia: pausa SUBITO. Non esiste piu' un
+        // "mai": tenere l'encoder attivo a vuoto e' proprio la causa del video
+        // congelato sul telefono (30 fps all-I senza consumatore).
+        mainHandler.postDelayed(pauseEncoderRunnable, if (timeout > 0L) timeout else 0L)
     }
 
     /** Timeout configurabile dalle Impostazioni (0 = mai). */
     fun setEncoderIdleTimeoutMs(timeoutMs: Long) {
         if (encoderIdleTimeoutMs == timeoutMs) return
         encoderIdleTimeoutMs = timeoutMs
-        AppLog.i(TAG, "Timeout sospensione encoder: ${timeoutMs / 60_000L} min")
+        AppLog.i(TAG, "Grazia sospensione encoder: ${timeoutMs / 1_000L} s")
 
         // Se un timer era gia' armato lo riarmo con il nuovo valore
         if (encoderIdleTimerPending) {
@@ -934,20 +1108,37 @@ class HudStreamController(
      */
     private fun resumeEncoderIfPaused() {
         cancelEncoderIdleTimer()
-        if (!encoderPaused) return
+        val wasPaused = encoderPaused
+        if (wasPaused) {
+            encoderPaused = false
+            encoder?.resume()
+        }
+        // Il `resize` del VirtualDisplay e' invasivo (ricrea la superficie del
+        // display virtuale): si fa SOLO quando si esce da una pausa vera.
+        // Su una semplice riconnessione basta chiedere un IDR al codec.
+        forceFreshFrame(resize = wasPaused)
+    }
 
-        encoderPaused = false
-        encoder?.resume()
-
-        val display = virtualDisplay
-        if (display != null) {
-            try {
-                display.resize(videoWidth, videoHeight, densityDpi())
-                AppLog.i(TAG, "VirtualDisplay riallineato per il primo frame post-pausa")
-            } catch (e: Exception) {
-                AppLog.w(TAG, "resize del VirtualDisplay fallito: ${e.message}")
+    /**
+     * Chiede al codec un frame di sincronizzazione (IDR).
+     *
+     * @param resize se true forza anche un `resize` del VirtualDisplay per
+     *        obbligare SurfaceFlinger a ricomporre subito un frame. Da usare
+     *        con parsimonia: e' l'operazione piu' invasiva del mirroring.
+     */
+    private fun forceFreshFrame(resize: Boolean) {
+        if (resize) {
+            val display = virtualDisplay
+            if (display != null) {
+                try {
+                    display.resize(videoWidth, videoHeight, densityDpi())
+                    AppLog.i(TAG, "VirtualDisplay riallineato dopo la pausa")
+                } catch (e: Exception) {
+                    AppLog.w(TAG, "resize del VirtualDisplay fallito: ${e.message}")
+                }
             }
         }
+        encoder?.requestSyncFrame()
     }
 
     /** Chiude solo la sessione Go, senza toccare projection/encoder/display. */
@@ -956,23 +1147,25 @@ class HudStreamController(
         stopChannelDiagnostics()
         stopDiscoveryInternal()
 
-        pendingSession?.let { session ->
-            try {
-                session.stopSession()
-            } catch (e: Exception) {
-                AppLog.i(TAG, "stopSession su sessione in avvio: ${e.message}")
-            }
-        }
+        val toStop = ArrayList<MobileSession>(2)
+        pendingSession?.let { toStop.add(it) }
         pendingSession = null
-
-        mobileSession?.let { session ->
-            try {
-                session.stopSession()
-            } catch (e: Exception) {
-                AppLog.i(TAG, "stopSession su sessione gia' chiusa: ${e.message}")
-            }
-        }
+        mobileSession?.let { toStop.add(it) }
         mobileSession = null
+
+        if (toStop.isNotEmpty()) {
+            // stopSession() e' bloccante (chiude socket TCP): mai sul thread
+            // chiamante, che qui e' il thread dei callback della libreria Go.
+            Thread({
+                toStop.forEach { session ->
+                    try {
+                        session.stopSession()
+                    } catch (e: Exception) {
+                        AppLog.i(TAG, "stopSession: ${e.message}")
+                    }
+                }
+            }, "HudSessionStop").start()
+        }
     }
 
     /**
@@ -1029,8 +1222,11 @@ class HudStreamController(
                     fps = targetFps,
                     bitrate = targetBitrate
                 ) { avccSample ->
-                    // Riferimento dinamico: la stessa istanza di encoder continua a
-                    // funzionare anche dopo una riconnessione della sessione Go.
+                    // Spinta SINCRONA come nel codice originale.
+                    // `PushFrame` lato Go scrive in un ring buffer in MEMORIA (non
+                    // sulla socket), quindi non blocca il thread di drain.
+                    // La coda con scarto introdotta in 1.1.7 faceva perdere frame
+                    // quando il buffer si riempiva -> video a scatti.
                     val active = mobileSession
                     if (active != null) {
                         try {
@@ -1228,23 +1424,24 @@ class HudStreamController(
         teardownMirroring()
         stopDiscoveryInternal()
 
-        pendingSession?.let { session ->
-            try {
-                session.stopSession()
-            } catch (e: Exception) {
-                AppLog.e(TAG, "stopSession (in avvio) fallita", e)
-            }
-        }
+        val toStop = ArrayList<MobileSession>(2)
+        pendingSession?.let { toStop.add(it) }
         pendingSession = null
-
-        mobileSession?.let { session ->
-            try {
-                session.stopSession()
-            } catch (e: Exception) {
-                AppLog.e(TAG, "stopSession fallita", e)
-            }
-        }
+        mobileSession?.let { toStop.add(it) }
         mobileSession = null
+
+        if (toStop.isNotEmpty()) {
+            // stopSession() e' bloccante: mai sul thread della UI ("Chiudi").
+            Thread({
+                toStop.forEach { session ->
+                    try {
+                        session.stopSession()
+                    } catch (e: Exception) {
+                        AppLog.e(TAG, "stopSession fallita", e)
+                    }
+                }
+            }, "HudSessionStop").start()
+        }
 
         if (state.value != StreamState.ERROR) {
             _state.value = StreamState.IDLE
@@ -1354,8 +1551,17 @@ class HudStreamController(
         private const val RECONNECT_MIN_DELAY_MS = 100L
         private const val RECONNECT_MAX_DELAY_MS = 10_000L
 
-        /** Default: dopo 5 minuti di attesa l'encoder va in pausa (batteria). */
-        private const val DEFAULT_ENCODER_IDLE_TIMEOUT_MS = 5 * 60 * 1_000L
+        /**
+         * Default: dopo 5 SECONDI di attesa l'encoder va in pausa.
+         *
+         * Era 5 minuti. Durante l'attesa l'encoder continuava a produrre 30 fps
+         * all-I (ogni frame un IDR) che nessuno consumava: quel carico saturava
+         * la CPU del telefono e congelava il layer video delle altre app
+         * (YouTube/navigatore) finche' non si faceva pause/play. La pausa e'
+         * istantanea da annullare (`resume()` non riavvia il codec), quindi una
+         * grazia corta non costa nulla in velocita' di ripresa.
+         */
+        private const val DEFAULT_ENCODER_IDLE_TIMEOUT_MS = 5_000L
 
         /** Porta dell'EC init handshake dell'HU. */
         private const val DEFAULT_HUD_PORT = 10930
@@ -1363,6 +1569,23 @@ class HudStreamController(
         /** Probe di raggiungibilita' dell'HU prima dell'handshake. */
         private const val PROBE_TIMEOUT_MS = 700
         private const val PROBE_INTERVAL_MS = 1_000L
-        private const val PROBE_MAX_WAIT_MS = 60_000L
+
+        /**
+         * Attesa massima per singolo ciclo di probe. Era 60 s: un ciclo cosi'
+         * lungo teneva il loop "impegnato" anche quando il TFT era gia' tornato
+         * su, ritardando la riconnessione. 8 s bastano (l'HU apre in ~1 s).
+         */
+        private const val PROBE_MAX_WAIT_MS = 8_000L
+
+        /** Dopo N cicli falliti si chiede al link di ricreare il gruppo P2P. */
+        private const val LINK_STALL_THRESHOLD = 3
+
+        /**
+         * Oltre questa soglia un handshake e' considerato bloccato e la guardia
+         * `connecting` si auto-ripara. L'handshake Go ha startupTimeout=10s:
+         * 90 s sono un margine piu' che sufficiente.
+         */
+        private const val CONNECT_STUCK_MS = 90_000L
     }
 }
+
