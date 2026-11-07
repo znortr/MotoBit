@@ -4,6 +4,35 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 1.3.6 — La notifica si chiude quando si chiude l'app
+
+**Data**: 2026-11-07 · **versionCode**: 1306
+
+### Sintomo
+Chiudendo l'app (swipe dal registro app) la notifica di mirroring restava
+**per sempre**, con i pulsanti `Stop` / `Riconnetti`, mostrando uno stato che non
+corrispondeva più a nulla: **falsa informazione**.
+
+### Causa
+`ScreenCaptureService` è un foreground service con `START_NOT_STICKY`: senza
+`onTaskRemoved()` continuava a vivere dopo la rimozione del task, e la sua
+notifica con lui. Il pulsante "Chiudi" già fermava tutto (`stopService`), ma lo
+swipe no.
+
+### Fix
+Override di `onTaskRemoved()` in `ScreenCaptureService`: alla rimozione del task
+si chiude la sessione (`HudSession.closeAll()`), si fa `stopSelf()` e quindi
+`onDestroy()` ferma la `MediaProjection`. La notifica sparisce.
+
+### Cosa resta volutamente invariato
+- **Home / passaggio in background**: `onTaskRemoved` **non** viene chiamato,
+  quindi la sessione resta viva — è la funzione che permette di usare il
+  navigatore con il mirroring attivo.
+- **Stop**: resta una pausa (notifica "In pausa", link vivo).
+- **Chiudi**: chiude tutto (già funzionante).
+
+---
+
 ## 🚀 1.3.5 — Fix del doppio tocco su "Avvia" dopo un "Chiudi"
 
 **Data**: 2026-11-07 · **versionCode**: 1305

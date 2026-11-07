@@ -92,6 +92,25 @@ class ScreenCaptureService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * L'utente ha rimosso il task dal registro app (swipe): per lui l'app e'
+     * chiusa, quindi si chiude anche la sessione HUD e si rimuove la notifica.
+     *
+     * Senza questo override il foreground service continuava a vivere: la
+     * notifica di mirroring restava per sempre con i pulsanti Stop/Riconnetti,
+     * mostrando uno stato che non corrispondeva piu' a nulla (falsa
+     * informazione).
+     *
+     * Nota: premere Home NON passa da qui — in quel caso l'app resta
+     * volutamente viva in background (serve mentre si usa il navigatore).
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        AppLog.i(TAG, "Task rimossa dall'utente: chiudo sessione e notifica")
+        runCatching { HudSession.closeAll() }
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         super.onDestroy()
         AppLog.i(TAG, "ScreenCaptureService distrutto")
