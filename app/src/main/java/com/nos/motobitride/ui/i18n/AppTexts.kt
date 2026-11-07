@@ -102,8 +102,9 @@ object AppTexts {
         "diag_keepalive_desc" to "Push dell'ora NON richiesto dal TFT sulla socket di controllo. Misurato che il TFT non lo legge: resta in coda e blocca gli ACK, facendogli chiudere la sessione. Lasciare OFF.",
 
         // QR Scan Screen
-        "qr_scan_title" to "Scansiona QR Code",
-        "qr_scan_instruction" to "Inquadra il QR Code mostrato sul display TFT della moto per salvare l'HUD.",
+        "qr_scan_title" to "Scansiona QR",
+        "qr_scan_instruction" to "Inquadra il QR sul TFT della moto che vuoi collegare.",
+        "qr_scan_permission" to "Serve il permesso fotocamera per scansionare il QR.",
 
         // Garage
         "garage_title" to "Garage",
@@ -132,6 +133,17 @@ object AppTexts {
         "garage_countdown_days" to "tra %d giorni",
         "garage_countdown_months" to "tra %d mesi",
         "garage_countdown_none" to "non impostata",
+        "garage_edit_title" to "Nome e targa",
+        "garage_deadlines_button" to "Scadenze",
+        "garage_deadlines_none" to "Nessuna scadenza impostata",
+        "garage_info_button" to "Info tecniche",
+        "garage_info_sub" to "HUD, SSID, MAC, risoluzione",
+        "garage_info_hud" to "HUD",
+        "garage_info_model" to "Modello",
+        "garage_info_resolution" to "Risoluzione",
+        "garage_info_protocol" to "Protocollo",
+        "common_save" to "Salva",
+        "common_cancel" to "Annulla",
     )
 
     private val enMap = mapOf(
@@ -235,8 +247,9 @@ object AppTexts {
         "diag_keepalive_desc" to "Clock push NOT requested by the TFT on the control socket. Measured that the TFT does not read it: it stays queued and blocks ACKs, making the TFT close the session. Leave OFF.",
 
         // QR Scan Screen
-        "qr_scan_title" to "Scan QR Code",
-        "qr_scan_instruction" to "Frame the QR Code shown on the motorcycle TFT display to save the HUD.",
+        "qr_scan_title" to "Scan QR",
+        "qr_scan_instruction" to "Frame the QR on the TFT of the motorcycle you want to connect.",
+        "qr_scan_permission" to "Camera permission is required to scan the QR.",
 
         // Garage
         "garage_title" to "Garage",
@@ -265,6 +278,17 @@ object AppTexts {
         "garage_countdown_days" to "in %d days",
         "garage_countdown_months" to "in %d months",
         "garage_countdown_none" to "not set",
+        "garage_edit_title" to "Name and plate",
+        "garage_deadlines_button" to "Deadlines",
+        "garage_deadlines_none" to "No deadline set",
+        "garage_info_button" to "Technical info",
+        "garage_info_sub" to "HUD, SSID, MAC, resolution",
+        "garage_info_hud" to "HUD",
+        "garage_info_model" to "Model",
+        "garage_info_resolution" to "Resolution",
+        "garage_info_protocol" to "Protocol",
+        "common_save" to "Save",
+        "common_cancel" to "Cancel",
     )
 
     fun get(key: String, language: AppLanguage): String {

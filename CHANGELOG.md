@@ -4,6 +4,42 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.0.1 — Garage e scansione QR ridisegnati
+
+**Data**: 2026-11-07 · **versionCode**: 2001
+
+> Solo UI: **nessuna modifica** a connessione, trasmissione, stabilità, encoder,
+> libreria Go (restano quelle congelate nella 2.0.0).
+
+### Garage — una sola card, pulita
+Prima c'erano tre card con dati ripetuti e il nome scritto nel codice. Ora:
+
+| Elemento | Comportamento |
+|---|---|
+| **Nome moto** (H1, bold) + **Targa** (H2) | in evidenza in cima |
+| **Icona matita** | apre il dialog **"Nome e targa"** (due campi + Salva/Annulla) — il nome non si modifica più digitando in pagina |
+| **Pulsante "Scadenze"** | stile card delle Impostazioni · sottotitolo = scadenza più vicina · apre un dialog con revisione/tassa/assicurazione + switch **"Avvisi di scadenza"** + giorni di preavviso. **Una sola icona ⓘ in alto a destra** che mostra la spiegazione inline |
+| **Pulsante "Info tecniche"** | apre un dialog con HUD, SSID, MAC, modello, S/N, risoluzione, protocollo |
+| **In fondo alla card** | **Dimentica** se c'è un HUD memorizzato, altrimenti **Scansiona QR** |
+
+I tre box precedenti sono stati accorpati: niente più dati duplicati.
+
+### Scansione QR — schermo pieno
+- **Barra in alto**: solo il logo **MotoBit centrato** e la **X** per chiudere (niente icone di navigazione, niente titolo inglese)
+- **Cornice bianca** al centro che indica dove inquadrare il QR
+- **Riquadro semitrasparente subito sotto la cornice** con il titolo *"Scansiona QR"* e l'istruzione tradotta:
+  *"Inquadra il QR sul TFT della moto che vuoi collegare."*
+- Sfumatura in alto per la leggibilità del logo sulla fotocamera
+- Estratto `MotobitLogo()` come composable riutilizzabile (usato anche dalla barra principale)
+
+### Nuove stringhe IT/EN
+`garage_edit_title`, `garage_deadlines_button`, `garage_deadlines_none`,
+`garage_info_button`, `garage_info_sub`, `garage_info_hud`, `garage_info_model`,
+`garage_info_resolution`, `garage_info_protocol`, `common_save`, `common_cancel`,
+`qr_scan_permission`; aggiornate `qr_scan_title` e `qr_scan_instruction`.
+
+---
+
 ## 🏁 2.0.0 — VERSIONE CANDIDATA DEFINITIVA (connessione / trasmissione / stabilità)
 
 **Data**: 2026-11-07 · **versionCode**: 2000 · **Backup**: `dev_backup\Motobit_alfa_V2.0.0.zip`
