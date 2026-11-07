@@ -4,6 +4,78 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 1.3.5 — Fix del doppio tocco su "Avvia" dopo un "Chiudi"
+
+**Data**: 2026-11-07 · **versionCode**: 1305
+
+### Verifica del Fix 1 (1.3.4)
+Dal log di 25 minuti: `flusso encoder` non presenta più picchi 43-51 fps.
+Massimo osservato **30 fps**, serie piatta. ✅
+
+### Bug trovato nel log (doppio tocco)
+```
+16:16:44.412  Chiudi premuto            → close(): stopRequested = true
+16:17:26.291  Avvia premuto             → link P2P parte
+16:17:29.808  LINK P2P ATTIVO           → setPreferredHost
+              ...niente streaming per 16 secondi...
+16:17:45.437  Avvia premuto (2° tocco)  → parte subito
+```
+
+**Causa**: `close()` imposta `stopRequested = true`. Quel flag vive in
+`HudSession`, cioè a **livello di processo**: sopravvive alla chiusura e riapertura
+dell'Activity. `onLinkRestored()` usciva subito con `if (stopRequested) return`,
+quindi la prima pressione di "Avvia" ricostruiva **solo il link**, senza avviare
+lo streaming. Il secondo tocco cadeva nel ramo "link già attivo" → `start()` →
+che azzera il flag.
+
+**Fix**: `onLinkRestored(autoResume = true)` azzera `stopRequested`/
+`streamPaused` prima del controllo: la richiesta esplicita dell'utente vale come
+un nuovo "Avvia".
+
+### Analisi consegna frame (per il futuro Fix 2)
+Dal log: la TFT richiede frame a **25,7 Hz** (`polls=1566` in 61 s) ma ne riceve
+**14,0 fps** (`frames=852`): il **46%** delle richieste riceve un `idle` di 4 byte.
+Il gate `now - lastAdvance >= interval` (33 ms) rifiuta l'avanzamento sulle
+richieste ravvicinate, e quello slot è perso per sempre.
+→ Fix 2 proposto: avanzare quando la **coda ha un frame** (non in base al tempo),
+lasciando che sia il polling della TFT a dettare il ritmo.
+
+### Invariato
+Link, riconnessione, sessione, risoluzione, bitrate, cattura: non toccati.
+
+---
+
+## 🚀 1.3.4 — Fix 1: cadenza encoder senza "recupero"
+
+**Data**: 2026-11-07 · **versionCode**: 1304
+
+### Sintomo (dal log di 1h)
+`flusso encoder` oscillava tra **12 e 51 fps** (target 30). Il TFT alternava
+raffiche e stalli → video non fluido. Rete esclusa: `retrans=0` su tutte le socket.
+
+### Causa
+In `HudEncoder.paceLoop`, `nextNs += intervalNs` non gestiva il ritardo: se il
+thread perdeva un giro (GC, contesa CPU) `nextNs` restava nel passato e le
+iterazioni successive accodavano **più frame di fila** per recuperare → raffica
+da 43-51 fps, seguita dallo stallo successivo.
+
+### Fix
+```kotlin
+val lateNs = now - nextNs
+nextNs = if (lateNs > intervalNs) now + intervalNs else nextNs + intervalNs
+```
+Se in ritardo di più di un intervallo si **riallinea** e salta il frame perso,
+invece di recuperarlo a raffica. Il contenuto non cambia: il pace loop rimanda
+comunque l'ultimo `currentFrame`, quindi saltare un duplicato è invisibile.
+
+### Invariato
+- `HudEncoder` era **identico alla 1.1.5** prima di questa modifica: nessuna
+  regressione pregressa, solo un miglioramento del pacing.
+- Non toccati: link, riconnessione, sessione Go, risoluzione, bitrate, keyint,
+  cattura schermo, libreria Go.
+
+---
+
 ## 🚀 1.3.3 — Revert delle due regressioni introdotte da me
 
 **Data**: 2026-11-06 · **versionCode**: 1303

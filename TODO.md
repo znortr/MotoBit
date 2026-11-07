@@ -339,6 +339,34 @@ il consumo è quasi solo quello del display acceso.
 
 ---
 
+## 10. Consegna frame al TFT ("Fix 2") — ANNOTATO, NON NECESSARIO ORA
+
+**Decisione (07/11/2026)**: non si implementa. La stabilità è validata e il difetto
+è impercettibile con il contenuto d'uso reale (mappe). Resta annotato per il futuro.
+
+### Il dato (misurato su due log)
+
+| Log | Richieste TFT | Frame inviati | Idle | FPS reali |
+|---|---|---|---|---|
+| 1 h | 29,1 Hz | 60.840 | 43% | **16,6 fps** |
+| 25 min | 25,7 Hz | 852 | 46% | **14,0 fps** |
+
+Il gate `now - lastAdvance >= interval` (33 ms) rifiuta l'avanzamento sulle richieste
+ravvicinate del TFT: quello slot è perso e si risponde `idle` (4 byte). Il TFT **tiene
+l'ultimo frame**, quindi il difetto è un "fermo immagine" di 40-70 ms.
+
+**Perché è accettabile**: con mappe (scorrimento lento) il fermo immagine è
+impercettibile; con video è evidente. Il caso d'uso reale è la mappa.
+
+### Due strade, se un giorno servisse
+
+| Strada | Come | Costo | Rischio |
+|---|---|---|---|
+| **A. Kotlin, 1 riga** | passare `60` invece di `targetFps` al 2° parametro di `Api.newMobileConfig(...)`: rende il gate permissivo (16,7 ms) lasciando l'encoder a 30 fps. In Go `TargetFPS` serve **solo** a `interval` e alla diagnostica: **non viene inviato all'HU** | 1 riga, nessun rebuild | traffico 1,66 → ~2,6-3 Mbps |
+| **B. Go** | in `LiveStreamSource.NextFrame` avanzare quando la **coda ha un frame**, non in base al tempo | richiede rebuild di `hudlib.aar` — **gomobile non è configurato** in questo ambiente | regressione possibile → video nero |
+
+---
+
 ## ✅ Chiusi / spiegati
 
 ### Freeze del video sul telefono alla disconnessione — **non è un bug nostro**

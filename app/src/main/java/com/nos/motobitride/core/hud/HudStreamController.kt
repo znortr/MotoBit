@@ -1025,6 +1025,17 @@ class HudStreamController(
      * È la correzione principale della riconnessione lenta (20-30 s).
      */
     fun onLinkRestored(autoResume: Boolean) {
+        if (autoResume) {
+            // L'utente ha chiesto il video: vale come un nuovo "Avvia".
+            //
+            // Senza questo reset, dopo un "Chiudi" il flag `stopRequested`
+            // resta `true` — e vive in `HudSession`, quindi a livello di
+            // PROCESSO, non di Activity — per cui la prima pressione di
+            // "Avvia" ricostruiva solo il link senza far partire lo streaming
+            // (serviva un secondo tocco). Visto nel log del 07/11 16:17:26.
+            stopRequested = false
+            streamPaused = false
+        }
         if (stopRequested || streamPaused) return
 
         passiveWait = false

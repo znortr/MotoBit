@@ -339,7 +339,19 @@ class HudEncoder(
                 }
                 continue
             }
-            nextNs += intervalNs
+
+            // Cadenza SENZA recupero.
+            //
+            // Con `nextNs += intervalNs` un ritardo (GC, contesa CPU) lasciava
+            // `nextNs` nel passato: le iterazioni successive trovavano
+            // `now >= nextNs` e accodavano piu' frame di fila per "recuperare".
+            // Da qui i picchi 43-51 fps seguiti da stalli (12-13 fps) visibili
+            // sul TFT come scatti. Ora, se siamo in ritardo di piu' di un
+            // intervallo, si riallinea e si salta il frame perso: la cadenza
+            // resta 30 fps senza raffiche. Il contenuto non cambia (il pace
+            // loop rimanda comunque l'ultimo `currentFrame`).
+            val lateNs = now - nextNs
+            nextNs = if (lateNs > intervalNs) now + intervalNs else nextNs + intervalNs
 
             val frame = synchronized(frameLock) { currentFrame } ?: continue
 
