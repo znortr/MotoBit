@@ -157,6 +157,19 @@ fun HudScreen(
 
     fun requestScreenCapture() {
         if (projectionRequested || isPreview) return
+
+        // M2 — Il consenso ha UN SOLO proprietario.
+        //
+        // Se e' in corso il flusso di StreamLaunchActivity (che chiede gia' lui
+        // il consenso e ha lui l'Activity visibile), la Home NON deve aprire un
+        // secondo dialog: da background riuscirebbe ad aprire l'Activity solo
+        // grazie al permesso overlay, portando MotoBit davanti e mandando in
+        // background l'app scelta dall'utente.
+        if (StreamLaunchActivity.active) {
+            AppLog.i(TAG_UI, "Consenso gestito da StreamLaunchActivity: la Home non lo richiede")
+            return
+        }
+
         projectionRequested = true
         try {
             AppLog.i(TAG_UI, "Richiesta consenso cattura schermo")

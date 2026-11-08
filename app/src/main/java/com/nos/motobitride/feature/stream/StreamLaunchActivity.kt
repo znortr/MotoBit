@@ -60,6 +60,19 @@ class StreamLaunchActivity : ComponentActivity() {
         private const val EXTRA_PACKAGE = "extra_package"
         private const val EXTRA_OPEN_APP = "extra_open_app"
 
+        /**
+         * Vero mentre questa Activity è in vita.
+         *
+         * Serve a `HudScreen` (M2): quando il flusso è attivo il consenso lo
+         * gestisce SOLO questa Activity. Se la Home lo chiedesse in parallelo
+         * (e lei può farlo anche da background grazie al permesso overlay)
+         * comparirebbe un secondo dialog e il suo task porterebbe MotoBit in
+         * primo piano, mandando in background l'app scelta dall'utente.
+         */
+        @Volatile
+        var active: Boolean = false
+            private set
+
         /** `openApp = true` → scenario 1 (TFT connesso); `false` → scenario 2 (bolla). */
         fun intent(context: Context, packageName: String, openApp: Boolean): Intent =
             Intent(context, StreamLaunchActivity::class.java).apply {
@@ -77,6 +90,8 @@ class StreamLaunchActivity : ComponentActivity() {
         SavedApps.init(applicationContext)
         HudSession.ensure(applicationContext)
 
+        active = true
+
         val packageName = intent.getStringExtra(EXTRA_PACKAGE).orEmpty()
         val openApp = intent.getBooleanExtra(EXTRA_OPEN_APP, true)
 
@@ -89,6 +104,11 @@ class StreamLaunchActivity : ComponentActivity() {
                 )
             }
         }
+    }
+
+    override fun onDestroy() {
+        active = false
+        super.onDestroy()
     }
 }
 
@@ -159,6 +179,13 @@ private fun StreamLaunchScreen(
     LaunchedEffect(Unit) {
         if (!hasHud) return@LaunchedEffect
         AppLog.i("StreamLaunch", "Avvio diretto: consenso + connessione in parallelo")
+
+        // M4 — il completamento vive in HudSession: questa Activity e' solo UI.
+        // Se viene distrutta durante l'attesa (TFT spento per minuti), lo
+        // streaming parte lo stesso quando la sessione e la proiezione sono
+        // pronte, e l'app viene riaperta.
+        HudSession.armPendingLaunch(packageName, openApp)
+
         requestConsentIfNeeded()
         if (!connected) {
             connectStartedHere = true
@@ -166,15 +193,9 @@ private fun StreamLaunchScreen(
         }
     }
 
-    // Avvio effettivo appena proiezione e connessione sono pronte.
-    LaunchedEffect(connected, projection) {
-        if (cancelled || !hasHud) return@LaunchedEffect
-        if (projection == null || !connected) return@LaunchedEffect
-
-        AppLog.i("StreamLaunch", "Pronto: avvio mirroring")
-        HudSession.startStream()
-        if (openApp) InstalledApps.launch(ctx, packageName)
-        onFinish()
+    // Quando lo streaming parte, questa schermata ha finito il suo lavoro.
+    LaunchedEffect(streamState) {
+        if (streamState == StreamState.MIRRORING) onFinish()
     }
 
     if (!hasHud) {
@@ -190,6 +211,7 @@ private fun StreamLaunchScreen(
             message = "Consenso e connessione al TFT in corso…",
             onCancel = {
                 cancelled = true
+                HudSession.cancelPendingLaunch()
                 // Se il consenso era già stato concesso il servizio tiene la
                 // proiezione: va fermato, altrimenti l'indicatore di
                 // condivisione resta acceso senza trasmettere nulla.

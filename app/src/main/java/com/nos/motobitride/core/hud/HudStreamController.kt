@@ -706,10 +706,22 @@ class HudStreamController(
 
         AppLog.i(TAG, "MediaProjection acquisita")
         mirrorAttempts = 0
-        if (!attachMirroring()) {
-            _state.value = StreamState.AWAITING_PROJECTION
-        } else {
+
+        // M1 — La proiezione è solo una RISORSA: non decide lo stato.
+        //
+        // Prima, se la sessione non era ancora pronta (isRunning=false, cioè
+        // sempre nei primi secondi dalla connessione) `attachMirroring()`
+        // restituiva false e qui si forzava AWAITING_PROJECTION. Quello stato
+        // faceva scattare il consenso "legacy" di HudScreen subito DOPO il
+        // consenso appena dato: doppio dialogo e salto di task (MotoBit davanti,
+        // app scelta dietro).
+        //
+        // Ora si aggancia solo se è possibile; altrimenti ci penserà
+        // `connectToHost()` quando la sessione sarà pronta.
+        if (attachMirroring()) {
             resumeEncoderIfPaused()
+        } else {
+            AppLog.i(TAG, "Proiezione pronta: mirroring agganciato alla connessione")
         }
     }
 

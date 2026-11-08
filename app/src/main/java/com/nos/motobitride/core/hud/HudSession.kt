@@ -7,13 +7,17 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.nos.motobitride.core.apps.InstalledApps
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.feature.ap.WifiApController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
 /**
@@ -255,16 +259,79 @@ object HudSession {
     fun disconnect() {
         wantsConnection = false
         wantsStream = false
+        cancelPendingLaunch()
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()
         appContext?.let { ScreenCaptureService.updateStatus(it, "Disconnesso") }
     }
 
+    // ------------------------------------------------------------------
+    // M4 — Avvio differito (sopravvive alla distruzione dell'Activity)
+    // ------------------------------------------------------------------
+
+    private var pendingLaunchJob: Job? = null
+    private var pendingLaunchPackage: String? = null
+    private var pendingLaunchOpenApp: Boolean = false
+
+    /**
+     * Arma l'avvio differito: quando **proiezione + connessione** sono pronte,
+     * avvia lo streaming e (se richiesto) apre l'app.
+     *
+     * Vive qui, a livello di PROCESSO, così il flusso si conclude anche se
+     * l'Activity che ha chiesto il consenso viene distrutta durante l'attesa
+     * (scenario 2 con TFT spento: l'attesa può durare minuti).
+     */
+    fun armPendingLaunch(packageName: String, openApp: Boolean) {
+        pendingLaunchPackage = packageName
+        pendingLaunchOpenApp = openApp
+        if (pendingLaunchJob != null) return
+
+        pendingLaunchJob = scope?.launch {
+            while (isActive) {
+                val state = stream?.state?.value
+                val connected = state == StreamState.CONNECTED ||
+                        state == StreamState.MIRRORING ||
+                        state == StreamState.AWAITING_PROJECTION
+                val projectionReady = ScreenCaptureService.mediaProjectionFlow.value != null
+
+                if (connected && projectionReady) {
+                    AppLog.i(TAG, "pendingLaunch: avvio streaming")
+                    stream?.start()
+
+                    // M3 — l'app va riaperta SEMPRE, anche quando era gia' stata
+                    // aperta prima (scenario 2): qualunque cosa abbia portato
+                    // MotoBit davanti viene annullata e il TFT mostra l'app
+                    // scelta, non la Home di MotoBit.
+                    val pkg = pendingLaunchPackage
+                    if (!pkg.isNullOrBlank()) {
+                        // Piccolo ritardo: lascia al capture l'aggancio della
+                        // superficie prima di cambiare app in primo piano.
+                        delay(300)
+                        appContext?.let { InstalledApps.launch(it, pkg) }
+                    }
+
+                    pendingLaunchPackage = null
+                    pendingLaunchJob = null
+                    return@launch
+                }
+                delay(400)
+            }
+        }
+    }
+
+    /** Annulla l'avvio differito (annullamento da parte dell'utente). */
+    fun cancelPendingLaunch() {
+        pendingLaunchJob?.cancel()
+        pendingLaunchJob = null
+        pendingLaunchPackage = null
+    }
+
     /** Chiusura completa (pulsante Chiudi): sessione, mirroring e link. */
     fun closeAll() {
         wantsStream = false
         wantsConnection = false
+        cancelPendingLaunch()
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()

@@ -4,6 +4,52 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 2.3.0 — Doppio consenso eliminato + flusso indistruttibile
+
+**Data**: 2026-11-07 · **versionCode**: 2300
+
+Quattro interventi mirati, dopo una **simulazione sul codice** che ha individuato
+la causa esatta (non era una race: era deterministico).
+
+### M1 — La proiezione non decide più lo stato (`HudStreamController`)
+```diff
+- if (!attachMirroring()) {
+-     _state.value = StreamState.AWAITING_PROJECTION
+- } else {
+-     resumeEncoderIfPaused()
+- }
++ if (attachMirroring()) resumeEncoderIfPaused()
+```
+`setMediaProjection()` scatta **appena** concesso il consenso, quando la sessione
+non è ancora pronta (`isRunning == false`): forzava `AWAITING_PROJECTION` e faceva
+scattare il consenso "legacy" della Home → **secondo dialogo + salto di task**.
+Ora la proiezione è solo una risorsa: ci pensa `connectToHost()` ad agganciarla.
+
+### M2 — Un solo proprietario del consenso (`HudScreen`)
+`StreamLaunchActivity.active` è vero mentre il flusso è in vita; la Home **non**
+chiede più il consenso in quel caso. Prima poteva farlo **da background** (esente
+grazie al permesso overlay) → portava MotoBit davanti e l'app scelta dietro.
+
+### M3 — L'app scelta viene riportata davanti
+Dopo l'avvio dello streaming `InstalledApps.launch(pkg)` viene chiamata **sempre**
+(≈300 ms di ritardo per lasciare agganciare la superficie), anche nello scenario 2.
+
+### M4 (ridotta) — Il completamento vive in `HudSession`
+Nuovo `HudSession.armPendingLaunch(pkg, openApp)`: un watcher a **vita di processo**
+che, appena `connected && projection != null`, chiama `startStream()` e riapre l'app.
+L'Activity diventa **sola UI** (consenso + pannello di attesa) e può essere
+distrutta — con TFT spento l'attesa può durare minuti — senza perdere il flusso.
+`cancelPendingLaunch()` su annullo, `disconnect()` e `closeAll()`.
+
+### Comportamento atteso
+| Scenario | Sequenza |
+|---|---|
+| TFT acceso | tap app → **1 consenso** → connessione in parallelo → streaming → app davanti |
+| TFT spento | tap app → bolla → AVVIA → **1 consenso** → retry finche il TFT appare → streaming + app davanti, **senza altri tocchi** |
+| Annulla | proiezione rilasciata, pending launch annullato, bolla torna "AVVIA" |
+
+---
+
 ## 🐛 2.2.5 — Consenso richiesto in loop nello scenario 2 (TFT spento)
 
 **Data**: 2026-11-07 · **versionCode**: 2205
