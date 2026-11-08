@@ -4,6 +4,36 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## ⚡ 2.2.3 — Avvio diretto: rimosso il dialogo "Avvia mirroring?"
+
+**Data**: 2026-11-07 · **versionCode**: 2203
+
+### Cosa è stato tolto
+Il dialogo di conferma intermedio **non c'è più**. Toccare un'app (o la bolla)
+apre **subito il consenso Android** e, in parallelo, avvia la connessione al TFT.
+
+### Prima
+```
+tap → dialog "Avvia mirroring?" → consenso → connessione → streaming
+```
+### Ora
+```
+tap → ┐ consenso Android
+tap → ┘ connessione TFT   (in parallelo, nessun dialogo nostro)
+     → appena pronti: streaming (+ apertura app)
+```
+
+### Cosa resta
+- Un solo pannello nostro: *"Avvio in corso — consenso e connessione al TFT…"*
+  con **Annulla**, mostrato dietro il dialogo di sistema.
+- Se il consenso è **già** stato concesso, non compare nulla: si aspetta solo
+  la connessione.
+- "Nessuna moto" resta come unico caso a sé (nessun HUD memorizzato).
+- Annullamento nello scenario 2 → `HudSession.disconnect()`, la bolla torna
+  pronta.
+
+---
+
 ## 🐛 2.2.2 — Bolla AVVIA non visibile: mancava un permesso
 
 **Data**: 2026-11-07 · **versionCode**: 2202

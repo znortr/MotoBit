@@ -13,7 +13,6 @@ import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.material3.AlertDialog
@@ -44,18 +43,16 @@ import com.nos.motobitride.ui.theme.MotobitRideTheme
 import kotlinx.coroutines.flow.MutableStateFlow
 
 /**
- * Activity **trasparente** che orchestra l'avvio del mirroring con **un solo
- * tocco** (sulla bolla o sull'app).
+ * Activity **trasparente** che avvia il mirroring con il **minor numero di
+ * passaggi possibile**.
  *
- * Ordine ottimizzato:
  * ```
- * conferma → consenso Android ┐
- *            connessione TFT  ┘ in parallelo
- *            → appena entrambi pronti: streaming (+ apertura app)
+ * tap app / bolla → [consenso Android]  ┐  (nessun dialogo intermedio)
+ *                   [connessione TFT]   ┘  in parallelo
+ *                 → appena pronti: streaming (+ apertura app)
  * ```
- * Così il dialogo del consenso non si somma ai 5-15 s di connessione.
- * Riusa integralmente `HudSession` e `ScreenCaptureService`: nessuna logica di
- * protocollo qui.
+ *
+ * Riusa `HudSession` e `ScreenCaptureService`: nessuna logica di protocollo qui.
  */
 class StreamLaunchActivity : ComponentActivity() {
 
@@ -115,10 +112,7 @@ private fun StreamLaunchScreen(
 
     val hasHud = SavedHud.current.value != null
 
-    var confirmed by remember { mutableStateOf(false) }
     var cancelled by remember { mutableStateOf(false) }
-
-    /** Connessione già avviata da questa schermata (per il rollback su annulla). */
     var connectStartedHere by remember { mutableStateOf(false) }
 
     val consentLauncher = rememberLauncherForActivityResult(
@@ -127,8 +121,8 @@ private fun StreamLaunchScreen(
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             AppLog.i("StreamLaunch", "Consenso cattura concesso")
             ScreenCaptureService.startService(ctx, result.resultCode, result.data!!)
-            // Lo streaming parte dall'effetto qui sotto, appena c'è la proiezione
-            // e la connessione è pronta.
+            // Lo streaming parte dall'effetto qui sotto, appena c'è proiezione
+            // e connessione.
         } else {
             AppLog.w("StreamLaunch", "Consenso negato: mirroring non avviato")
             cancelled = true
@@ -138,7 +132,10 @@ private fun StreamLaunchScreen(
     }
 
     fun requestConsentIfNeeded() {
-        if (projection != null) return
+        if (projection != null) {
+            AppLog.i("StreamLaunch", "Proiezione già attiva: nessun dialogo")
+            return
+        }
         val manager = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE)
                 as? MediaProjectionManager ?: return
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -151,10 +148,10 @@ private fun StreamLaunchScreen(
         consentLauncher.launch(intent)
     }
 
-    fun onConfirm() {
-        confirmed = true
-        AppLog.i("StreamLaunch", "Confermato: consenso + connessione in parallelo")
-        // Consenso (se serve) e connessione partono insieme.
+    // NESSUN dialogo intermedio: al primo frame partono consenso e connessione.
+    LaunchedEffect(Unit) {
+        if (!hasHud) return@LaunchedEffect
+        AppLog.i("StreamLaunch", "Avvio diretto: consenso + connessione in parallelo")
         requestConsentIfNeeded()
         if (!connected) {
             connectStartedHere = true
@@ -162,15 +159,9 @@ private fun StreamLaunchScreen(
         }
     }
 
-    fun onDismissFlow() {
-        cancelled = true
-        rollbackIfNeeded(openApp, connectStartedHere)
-        onFinish()
-    }
-
-    // Avvio effettivo: serve conferma + proiezione pronta + connessione pronta.
-    LaunchedEffect(confirmed, connected, projection) {
-        if (!confirmed || cancelled) return@LaunchedEffect
+    // Avvio effettivo appena proiezione e connessione sono pronte.
+    LaunchedEffect(connected, projection) {
+        if (cancelled || !hasHud) return@LaunchedEffect
         if (projection == null || !connected) return@LaunchedEffect
 
         AppLog.i("StreamLaunch", "Pronto: avvio mirroring")
@@ -179,30 +170,22 @@ private fun StreamLaunchScreen(
         onFinish()
     }
 
-    when {
-        !hasHud -> SimpleDialog(
+    if (!hasHud) {
+        SimpleDialog(
             title = "Nessuna moto",
             message = "Registra prima il TFT dalla Home di MotoBit.",
             confirm = "Chiudi",
             onConfirm = onFinish,
             onDismiss = onFinish
         )
-
-        !confirmed -> SimpleDialog(
-            title = "Avvia mirroring?",
-            message = if (openApp && packageName.isNotBlank())
-                "La trasmissione verso il TFT verrà avviata e poi si aprirà l'app scelta."
-            else
-                "La trasmissione verso il TFT verrà avviata.",
-            confirm = "Avvia",
-            onConfirm = { onConfirm() },
-            dismiss = "Annulla",
-            onDismiss = { onDismissFlow() }
-        )
-
-        else -> WaitingDialog(
+    } else if (!cancelled) {
+        WaitingDialog(
             message = "Consenso e connessione al TFT in corso…",
-            onCancel = { onDismissFlow() }
+            onCancel = {
+                cancelled = true
+                rollbackIfNeeded(openApp, connectStartedHere)
+                onFinish()
+            }
         )
     }
 }
@@ -244,24 +227,14 @@ private fun SimpleDialog(
     message: String,
     confirm: String,
     onConfirm: () -> Unit,
-    dismiss: String? = null,
     onDismiss: () -> Unit
 ) {
     AlertDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
-        text = {
-            Text(
-                text = message,
-                style = MaterialTheme.typography.bodyMedium,
-                modifier = Modifier.padding(vertical = 4.dp)
-            )
-        },
+        text = { Text(text = message, style = MaterialTheme.typography.bodyMedium) },
         confirmButton = {
             TextButton(onClick = onConfirm) { Text(confirm) }
-        },
-        dismissButton = if (dismiss != null) {
-            { TextButton(onClick = onDismiss) { Text(dismiss) } }
-        } else null
+        }
     )
 }
