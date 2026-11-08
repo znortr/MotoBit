@@ -4,6 +4,39 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.1.2 — Pulsante di connessione: forma, colori, nome e icone
+
+**Data**: 2026-11-07 · **versionCode**: 2102
+
+### 1. Lo switch non cambiava il pulsante
+`autoWaiting` era usato nell'`onClick` ma **non** nel colore né nel testo: con
+l'automatico attivo il pulsante restava verde "Tocca per connettere".
+Ora `autoWaiting` è nel **colore** (giallo) e nel **testo** ("In attesa del TFT…
+· tocca per annullare e passare a manuale").
+
+### 2. Forma
+Era una pillola (angoli completamente arrotondati). Ora:
+- `shape = RoundedCornerShape(18.dp)` → **rettangolare con angoli morbidi**
+- `elevation = 6.dp` (2 dp alla pressione) → **ombra**
+- altezza **140 dp**, full width
+- colori pieni: `#D32F2F` (nessuna moto) · `#F9A825` (sta lavorando / in attesa) · `#2E7D32` (connessa)
+
+### 3. Nome su due righe
+- Riga 1: **nome utente** (o nome HUD se vuoto) in `titleLarge` bold
+- Riga 2: stato in `labelMedium`
+Il campo è ora popolato con `vehicleDisplayName(profile, hudName)`, quindi usa il
+nome scritto nel Garage e solo in mancanza quello dell'HUD.
+
+### 4. Icone
+| Stato | Icona a sinistra |
+|---|---|
+| Nessuna moto | QR |
+| In connessione / disconnessa | **catena spezzata** (`ic_link_off`) |
+| Connessa | ✓ |
+E a destra, solo mentre lavora, uno **spinner**. Rimosso il vecchio ✓ attenuato.
+
+---
+
 ## 🐛 2.1.1 — Pulsante grande: annullamento, reazione allo switch, dettagli
 
 **Data**: 2026-11-07 · **versionCode**: 2101

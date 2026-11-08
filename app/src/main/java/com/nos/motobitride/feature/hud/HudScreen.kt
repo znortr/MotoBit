@@ -22,6 +22,7 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
@@ -51,6 +52,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
 import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
@@ -58,6 +60,8 @@ import androidx.core.content.ContextCompat
 import com.nos.motobitride.core.hud.HudSession
 import com.nos.motobitride.core.hud.ScreenCaptureService
 import com.nos.motobitride.core.hud.StreamState
+import com.nos.motobitride.core.garage.VehicleStore
+import com.nos.motobitride.core.garage.vehicleDisplayName
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.qr.QrContent
@@ -245,6 +249,9 @@ fun HudScreen(
 
     val linkConnected = wifiController?.isHudConnected ?: false
     val hudName = savedHud?.displayName ?: "-"
+    // Nome mostrato: quello scritto dall'utente, altrimenti quello dell'HUD.
+    val profile by VehicleStore.current.collectAsState()
+    val displayName = vehicleDisplayName(profile, savedHud?.displayName)
 
     // Riga piccola in fondo al pulsante: le stesse informazioni della vecchia card.
     val details = buildString {
@@ -372,12 +379,18 @@ fun HudScreen(
                     },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .height(124.dp),
-                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
+                        .height(140.dp),
+                    contentPadding = PaddingValues(horizontal = 18.dp, vertical = 14.dp),
+                    // Angoli morbidi ma NON a pillola: il pulsante deve sembrare una card.
+                    shape = RoundedCornerShape(18.dp),
+                    elevation = ButtonDefaults.buttonElevation(
+                        defaultElevation = 6.dp,
+                        pressedElevation = 2.dp
+                    ),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = when {
-                            noBike -> Color(0xFFE53935)
-                            working -> Color(0xFFF9A825)
+                            noBike -> Color(0xFFD32F2F)
+                            working || autoWaiting -> Color(0xFFF9A825)
                             else -> Color(0xFF2E7D32)
                         }
                     )
@@ -387,53 +400,62 @@ fun HudScreen(
                         verticalArrangement = Arrangement.spacedBy(6.dp)
                     ) {
                         Row(verticalAlignment = Alignment.CenterVertically) {
+                            // Icona a SINISTRA: QR (nessuna moto) / catena spezzata
+                            // (in connessione o disconnessa) / spunta (connessa).
                             if (noBike) {
                                 Icon(
                                     painter = painterResource(R.drawable.ic_qr),
                                     contentDescription = null,
-                                    tint = Color.White
-                                )
-                            } else if (working) {
-                                CircularProgressIndicator(
-                                    modifier = Modifier.size(20.dp),
-                                    color = Color.White,
-                                    strokeWidth = 2.dp
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             } else if (connected) {
                                 Icon(
                                     imageVector = Icons.Default.Check,
                                     contentDescription = null,
-                                    tint = Color.White
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             } else {
                                 Icon(
-                                    imageVector = Icons.Default.Check,
+                                    painter = painterResource(R.drawable.ic_link_off),
                                     contentDescription = null,
-                                    tint = Color.White.copy(alpha = 0.35f)
+                                    tint = Color.White,
+                                    modifier = Modifier.size(28.dp)
                                 )
                             }
-                            Spacer(Modifier.width(12.dp))
+                            Spacer(Modifier.width(14.dp))
                             Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
                                 Text(
                                     text = if (noBike) {
                                         AppTexts.get("hud_connect_register", currentLang)
                                     } else {
-                                        "$hudName \u00b7 " + when {
-                                            working -> AppTexts.get("hud_connect_connecting", currentLang)
-                                            connected -> AppTexts.get("hud_connect_connected", currentLang)
-                                            else -> AppTexts.get("hud_connect_tap", currentLang)
-                                        }
+                                        displayName
                                     },
-                                    style = MaterialTheme.typography.titleMedium,
+                                    style = MaterialTheme.typography.titleLarge,
+                                    fontWeight = FontWeight.Bold,
                                     color = Color.White
                                 )
-                                if (working) {
-                                    Text(
-                                        text = AppTexts.get("hud_tap_to_cancel", currentLang),
-                                        style = MaterialTheme.typography.labelSmall,
-                                        color = Color.White.copy(alpha = 0.9f)
-                                    )
-                                }
+                                Text(
+                                    text = when {
+                                        noBike -> AppTexts.get("hud_connect_register_sub", currentLang)
+                                        working -> AppTexts.get("hud_connect_connecting", currentLang) +
+                                                " \u00b7 " + AppTexts.get("hud_tap_to_cancel", currentLang)
+                                        autoWaiting -> AppTexts.get("hud_connect_waiting", currentLang) +
+                                                " \u00b7 " + AppTexts.get("hud_tap_to_cancel_manual", currentLang)
+                                        connected -> AppTexts.get("hud_connect_connected", currentLang)
+                                        else -> AppTexts.get("hud_connect_tap", currentLang)
+                                    },
+                                    style = MaterialTheme.typography.labelMedium,
+                                    color = Color.White.copy(alpha = 0.92f)
+                                )
+                            }
+                            if (working || autoWaiting) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
                             }
                         }
 
