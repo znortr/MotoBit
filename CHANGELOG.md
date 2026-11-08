@@ -4,6 +4,39 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.2.5 — Consenso richiesto in loop nello scenario 2 (TFT spento)
+
+**Data**: 2026-11-07 · **versionCode**: 2205
+
+### Sintomo
+Con TFT spento, toccando AVVIA il dialog di consenso Android ricompariva **a
+ogni consenso**; il TFT, riacceso, non riusciva comunque a connettersi.
+
+### Causa
+`StreamLaunchActivity` aveva **`android:noHistory="true"`**.
+Il dialogo di consenso MediaProjection è un'**Activity di sistema**: quando
+copriva la nostra, `noHistory` la **finiva**. Al ritorno l'Activity **rinasceva**
+→ `LaunchedEffect(Unit)` → **nuovo consenso** → loop. E in ogni ciclo la
+connessione veniva riavviata da zero, quindi non si stabilizzava mai.
+
+### Fix
+1. **Rimosso `noHistory`** dal manifest (restano `excludeFromRecents` e
+   `taskAffinity`).
+2. Guardia `consentRequested` in `StreamLaunchActivity`: il consenso si chiede
+   **una volta sola per istanza**.
+3. Su **Annulla** viene chiamato `ScreenCaptureService.stopService(ctx)`: se il
+   consenso era già stato dato, la proiezione viene rilasciata e l'indicatore di
+   condivisione si spegne.
+
+### Comportamento atteso (ora)
+- **TFT acceso** → consenso + connessione in parallelo → streaming appena
+  connesso.
+- **TFT spento** → consenso **una volta**, poi la connessione ritenta **fino a
+  quando il TFT appare** (limite = impostazione *attesa attiva*, poi ascolto
+  passivo che si riattiva al ritorno del peer). Appena connesso → streaming.
+
+---
+
 ## 🐛 2.2.4 — La bolla AVVIA si distrugge chiudendo MotoBit
 
 **Data**: 2026-11-07 · **versionCode**: 2204

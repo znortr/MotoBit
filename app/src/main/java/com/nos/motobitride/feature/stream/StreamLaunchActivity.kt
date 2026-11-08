@@ -115,6 +115,11 @@ private fun StreamLaunchScreen(
     var cancelled by remember { mutableStateOf(false) }
     var connectStartedHere by remember { mutableStateOf(false) }
 
+    // Guardia: il consenso si chiede UNA volta per istanza di Activity.
+    // (Con `noHistory` nel manifest l'Activity veniva finita quando compariva il
+    // dialogo di sistema: al ritorno rinasceva e richiedeva il consenso in loop.)
+    var consentRequested by remember { mutableStateOf(false) }
+
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
@@ -132,10 +137,12 @@ private fun StreamLaunchScreen(
     }
 
     fun requestConsentIfNeeded() {
+        if (consentRequested) return
         if (projection != null) {
             AppLog.i("StreamLaunch", "Proiezione già attiva: nessun dialogo")
             return
         }
+        consentRequested = true
         val manager = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE)
                 as? MediaProjectionManager ?: return
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
@@ -183,6 +190,10 @@ private fun StreamLaunchScreen(
             message = "Consenso e connessione al TFT in corso…",
             onCancel = {
                 cancelled = true
+                // Se il consenso era già stato concesso il servizio tiene la
+                // proiezione: va fermato, altrimenti l'indicatore di
+                // condivisione resta acceso senza trasmettere nulla.
+                ScreenCaptureService.stopService(ctx)
                 rollbackIfNeeded(openApp, connectStartedHere)
                 onFinish()
             }

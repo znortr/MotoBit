@@ -70,12 +70,17 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.MotobitRide">
 
-        <!-- Dialoghi trasparenti di avvio mirroring (conferma + consenso) -->
+        <!--
+            Activity trasparente che avvia il mirroring (consenso + attesa).
+            NB: NIENTE `noHistory`. Il dialogo di consenso MediaProjection e'
+            un'Activity di sistema: con noHistory la nostra veniva FINITA quando
+            il dialogo la copriva, e al ritorno rinasceva chiedendo di nuovo il
+            consenso (loop di richieste).
+        -->
         <activity
             android:name=".feature.stream.StreamLaunchActivity"
             android:excludeFromRecents="true"
             android:exported="false"
-            android:noHistory="true"
             android:taskAffinity=".stream"
             android:theme="@style/Theme.MotobitRide.Translucent" />
 
