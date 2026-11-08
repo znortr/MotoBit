@@ -4,6 +4,34 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.1.5 — Splash nativa (una sola fase): rimosso l'overlay in-app
+
+**Data**: 2026-11-07 · **versionCode**: 2105
+
+### Perché è stata rifatta
+La 2.1.4 mostrava **prima** la splash di Android e **poi** l'immagine: due fasi,
+effetto sbagliato. Non è un difetto aggirabile: da Android 12 la SplashScreen API
+esiste proprio per essere **l'unica** schermata di avvio.
+
+### Soluzione: splash nativa, nessuna doppia fase
+| Intervento | Dettaglio |
+|---|---|
+| **`values-v31/themes.xml`** | `windowSplashScreenBackground` scuro + **`windowSplashScreenAnimatedIcon` = `@drawable/ic_launcher_foreground`** (il simbolo dell'app) + `windowSplashScreenIconBackgroundColor` scuro |
+| **`values/themes.xml`** | `Theme.MotobitRide` ha `windowBackground` scuro (niente lampi bianchi); `Theme.MotobitRide.Splash` per la sola finestra di avvio |
+| **`MainActivity`** | rimossi `SplashOverlay()`, il ritardo di 750 ms e gli import annessi |
+| **`drawable-nodpi/ic_splash_strtup.png`** | **rimossa** (603 KB inutili) |
+
+### Risultato
+All'avvio si vede **subito** la splash di sistema: sfondo `#0B0B0D` + simbolo
+dell'app, poi l'app. Una fase sola, come le app native.
+
+### Nota
+Se in futuro si vorrà un logo testuale "MotoBit" (bianco/arancione) al posto del
+simbolo, basta creare un **vector drawable** quadrato e puntarlo da
+`windowSplashScreenAnimatedIcon`: la struttura è già pronta.
+
+---
+
 ## 🎨 2.1.4 — La splash ora si vede davvero (overlay in-app) e non deforma
 
 **Data**: 2026-11-07 · **versionCode**: 2104
