@@ -2,4 +2,13 @@
 <resources>
 
     <style name="Theme.MotobitRide" parent="android:Theme.Material.Light.NoActionBar" />
+
+    <!--
+        Tema della sola schermata di avvio: finestra con lo splash scuro al posto
+        del bianco di default. MainActivity riporta poi il tema normale prima di
+        super.onCreate(), cosi' il resto dell'app non ne risente.
+    -->
+    <style name="Theme.MotobitRide.Splash" parent="Theme.MotobitRide">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+    </style>
 </resources>

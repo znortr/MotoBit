@@ -4,6 +4,31 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.1.3 — Splash di avvio personalizzata (niente più schermata bianca)
+
+**Data**: 2026-11-07 · **versionCode**: 2103
+
+### Sintomo
+All'avvio compariva il **bianco** del tema `Theme.Material.Light`.
+
+### Soluzione
+| File | Cosa fa |
+|---|---|
+| `drawable/splash_background.xml` **[nuovo]** | layer-list: colore `#0B0B0D` + `ic_splash_strtup.png` a tutto schermo |
+| `values/colors.xml` | nuova `splash_background` |
+| `values/themes.xml` | nuovo tema `Theme.MotobitRide.Splash` (windowBackground = splash) |
+| `values-v31/themes.xml` **[nuovo]** | su Android 12+ imposta anche `windowSplashScreenBackground` scuro, così la splash **di sistema** non è più bianca |
+| `AndroidManifest.xml` | l'Activity usa `Theme.MotobitRide.Splash` |
+| `MainActivity` | `setTheme(R.style.Theme_MotobitRide)` **prima** di `super.onCreate()`: lo splash resta solo nella finestra di avvio, non come sfondo dell'Activity |
+
+### Sequenza risultante
+- **Android 12+**: splash di sistema (scura, con l'icona) → immagine di splash → app
+- **Android < 12**: immagine di splash → app
+
+Nessuna schermata bianca in nessun caso.
+
+---
+
 ## 🐛 2.1.2 — Pulsante di connessione: forma, colori, nome e icone
 
 **Data**: 2026-11-07 · **versionCode**: 2102

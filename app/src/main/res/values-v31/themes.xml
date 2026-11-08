@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+
+    <!--
+        Android 12+ mostra una splash screen di sistema PRIMA della finestra
+        dell'app: senza questi attributi userebbe lo sfondo chiaro del tema
+        (la "schermata bianca" fastidiosa). Qui la si allinea allo sfondo scuro
+        dello splash, cosi' la sequenza e' coerente:
+            splash di sistema (scuro + icona) -> immagine di splash -> app
+    -->
+    <style name="Theme.MotobitRide.Splash" parent="Theme.MotobitRide">
+        <item name="android:windowBackground">@drawable/splash_background</item>
+        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+    </style>
+
+</resources>
