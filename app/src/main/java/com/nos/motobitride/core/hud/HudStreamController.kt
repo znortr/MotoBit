@@ -34,6 +34,7 @@ enum class StreamState {
     CONNECTING,           // handshake PXC / EasyConn in corso
     WAITING_HUD,          // link/HU non raggiungibile: si ritenta all'infinito
     AWAITING_PROJECTION,  // sessione pronta, manca il consenso alla cattura schermo
+    CONNECTED,            // sessione HUD pronta, video NON avviato (scelta utente)
     MIRRORING,            // encoder + VirtualDisplay attivi
     ERROR                 // errore non recuperabile
 }
@@ -223,8 +224,20 @@ class HudStreamController(
      * inviare frame. Chiuderla faceva rifiutare all'HU il nuovo handshake per
      * ~45 s (visto in log: stop 09:54:20 -> ripresa solo 09:55:11).
      */
+    /**
+     * Vero quando l'utente ha fermato il video ("Ferma mirroring"):
+     * la sessione resta viva e la riconnessione resta attiva.
+     * Diverso da [stopRequested], che è la chiusura totale ("Chiudi").
+     */
     @Volatile
     private var streamPaused = false
+
+    /**
+     * Vero quando l'utente vuole il video. Se false la sessione si stabilisce
+     * comunque (stato CONNECTED) ma encoder e VirtualDisplay non vengono creati.
+     */
+    @Volatile
+    private var videoWanted = false
     @Volatile
     private var encoderIdleTimeoutMs = DEFAULT_ENCODER_IDLE_TIMEOUT_MS
     private var encoderIdleTimerPending = false
@@ -485,19 +498,37 @@ class HudStreamController(
     // ------------------------------------------------------------------
 
     fun start() {
-        if (isRunning || isDiscovering) {
-            AppLog.w(TAG, "start() ignorato: running=$isRunning discovering=$isDiscovering")
+        videoWanted = true
+        stopRequested = false
+        streamPaused = false
+
+        // Sessione gia' viva ma video spento: basta agganciare il mirroring,
+        // senza rifare l'handshake.
+        if (isRunning) {
+            if (_state.value == StreamState.MIRRORING) {
+                AppLog.i(TAG, "start(): mirroring gia' attivo")
+                return
+            }
+            acquireStreamLocks()
+            resumeEncoderIfPaused()
+            if (mediaProjection != null && attachMirroring()) {
+                _state.value = StreamState.MIRRORING
+                _status.value = "Mirroring ${videoWidth}x${videoHeight}"
+                encoder?.requestSyncFrame()
+                AppLog.i(TAG, "Video avviato sulla sessione gia' connessa")
+            } else {
+                _state.value = StreamState.AWAITING_PROJECTION
+            }
+            startWatchdog()
             return
         }
-        if (_state.value == StreamState.MIRRORING) {
-            AppLog.w(TAG, "start() ignorato: mirroring gia' attivo")
+
+        if (isDiscovering) {
+            AppLog.w(TAG, "start() ignorato: discovering gia' attivo")
             return
         }
 
         acquireStreamLocks()
-
-        stopRequested = false
-        streamPaused = false
         mirrorAttempts = 0
         reconnectAttempt = 0
         reconnectDelayMs = RECONNECT_MIN_DELAY_MS
@@ -522,6 +553,41 @@ class HudStreamController(
         }
 
         _status.value = "Ricerca HUD..."
+        beginDiscovery()
+    }
+
+    /**
+     * Stabilisce la **connessione** con l'HUD senza avviare il video.
+     *
+     * Stato finale: CONNECTED (sessione pronta, encoder non creato).
+     * Se la sessione e' gia' viva non fa nulla. Il video si avvia poi con
+     * [start].
+     */
+    fun connectOnly() {
+        videoWanted = false
+        stopRequested = false
+        streamPaused = true
+
+        if (isRunning) {
+            _state.value = StreamState.CONNECTED
+            _status.value = "Connesso all'HUD"
+            AppLog.i(TAG, "connectOnly(): sessione gia' viva")
+            return
+        }
+        if (isDiscovering) return
+        if (isConnecting()) {
+            AppLog.i(TAG, "connectOnly(): handshake gia' in corso")
+            return
+        }
+
+        acquireStreamLocks()
+        mirrorAttempts = 0
+        reconnectAttempt = 0
+        reconnectDelayMs = RECONNECT_MIN_DELAY_MS
+        reconnectPending = false
+
+        _status.value = "Connessione all'HUD..."
+        AppLog.i(TAG, "connectOnly(): avvio connessione (video non richiesto)")
         beginDiscovery()
     }
 
@@ -570,21 +636,20 @@ class HudStreamController(
     }
 
     fun stop() {
-        AppLog.i(TAG, "stop() richiesto (pausa: sessione e cattura restano attive)")
+        AppLog.i(TAG, "stop(): video fermo, sessione e link restano attivi")
+        videoWanted = false
         streamPaused = true
-        stopWatchdog()
         cancelEncoderIdleTimer()
-        isRunning = false
-        releaseStreamLocks()
 
-        // Si smette di inviare frame, ma la sessione Go resta aperta.
+        // NB: NON si ferma il watchdog e NON si rilasciano i lock: la sessione
+        // e il link devono restare vivi (e riconnettersi da soli se cadono).
         if (!encoderPaused) {
             encoderPaused = true
             encoder?.pause()
         }
 
-        _state.value = StreamState.IDLE
-        _status.value = "In pausa"
+        _state.value = if (isRunning) StreamState.CONNECTED else StreamState.IDLE
+        _status.value = "Connesso · video fermo"
     }
 
     /** Chiusura completa: sessione + mirroring + projection. Usata da "Chiudi". */
@@ -878,8 +943,8 @@ class HudStreamController(
 
             // Stop/Pausa puo' arrivare mentre startSession() e' bloccato: senza
             // questo controllo la sessione appena creata rivitalizzerebbe lo stream.
-            if (stopRequested || streamPaused) {
-                AppLog.i(TAG, "Stop/pausa durante l'handshake: chiudo la sessione creata")
+            if (stopRequested) {
+                AppLog.i(TAG, "Chiudi durante l'handshake: chiudo la sessione creata")
                 closeSessionOnly()
                 return
             }
@@ -920,7 +985,12 @@ class HudStreamController(
 
         // ORDINE CORRETTO: solo adesso chiediamo (o usiamo) la MediaProjection.
         // Tenerla in attesa durante l'handshake la fa scadere su Android 14+.
-        if (mediaProjection == null) {
+        if (!videoWanted) {
+            // L'utente vuole solo la connessione: nessun encoder, nessuna cattura.
+            _state.value = StreamState.CONNECTED
+            _status.value = "Connesso all'HUD"
+            AppLog.i(TAG, "Sessione pronta: video non richiesto (CONNECTED)")
+        } else if (mediaProjection == null) {
             _state.value = StreamState.AWAITING_PROJECTION
             _status.value = "Consenti la cattura schermo"
             AppLog.i(TAG, "In attesa del consenso alla cattura schermo")
@@ -964,13 +1034,9 @@ class HudStreamController(
      */
     private fun scheduleReconnect(reason: String) {
         if (stopRequested) return
-        if (streamPaused) {
-            // In pausa non si riconnette: la sessione, se l'HU l'ha chiusa, viene
-            // solo dimenticata. Al prossimo Avvia se ne apre una nuova.
-            AppLog.i(TAG, "Stream in pausa: nessuna riconnessione ($reason)")
-            if (mobileSession != null || pendingSession != null) closeSessionOnly()
-            return
-        }
+        // NB: `streamPaused` (video fermo) NON blocca più la riconnessione:
+        // la connessione deve restare viva anche a video spento, altrimenti
+        // "connetti e poi avvia il mirroring" non regge una caduta di link.
 
         if (passiveWait) {
             // Attesa attiva scaduta: nessun tentativo. Il link resta in ascolto
@@ -1024,19 +1090,16 @@ class HudStreamController(
      * aspettare il timer (che nel frattempo puo' essere arrivato a 10 s).
      * È la correzione principale della riconnessione lenta (20-30 s).
      */
-    fun onLinkRestored(autoResume: Boolean) {
-        if (autoResume) {
-            // L'utente ha chiesto il video: vale come un nuovo "Avvia".
-            //
-            // Senza questo reset, dopo un "Chiudi" il flag `stopRequested`
-            // resta `true` — e vive in `HudSession`, quindi a livello di
-            // PROCESSO, non di Activity — per cui la prima pressione di
-            // "Avvia" ricostruiva solo il link senza far partire lo streaming
-            // (serviva un secondo tocco). Visto nel log del 07/11 16:17:26.
-            stopRequested = false
-            streamPaused = false
+    fun onLinkRestored(autoConnect: Boolean) {
+        // Il link e' tornato: vale come una nuova richiesta di connessione, e
+        // azzera lo `stopRequested` ereditato da un "Chiudi" (vive in
+        // HudSession, quindi a livello di PROCESSO).
+        stopRequested = false
+        if (!autoConnect) {
+            // Nessuna connessione richiesta: si azzera solo il backoff.
+            passiveWait = false
+            return
         }
-        if (stopRequested || streamPaused) return
 
         passiveWait = false
         reconnectRunnable?.let { mainHandler.removeCallbacks(it) }
@@ -1048,10 +1111,6 @@ class HudStreamController(
         if (isRunning) return // sessione gia' viva: nulla da fare
         if (isConnecting()) {
             AppLog.i(TAG, "Link tornato: handshake gia' in corso, non ne avvio un altro")
-            return
-        }
-        if (!autoResume) {
-            AppLog.i(TAG, "Link tornato: backoff azzerato (video non richiesto)")
             return
         }
 
@@ -1337,7 +1396,7 @@ class HudStreamController(
             override fun run() {
                 if (!watchdogActive) return
 
-                if (isRunning && mediaProjection != null &&
+                if (isRunning && videoWanted && mediaProjection != null &&
                     (encoder == null || virtualDisplay == null)
                 ) {
                     if (mirrorAttempts >= MAX_MIRROR_ATTEMPTS) {

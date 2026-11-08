@@ -15,14 +15,23 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Check
 import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Scaffold
@@ -36,8 +45,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalInspectionMode
+import androidx.compose.ui.res.painterResource
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.core.app.ActivityCompat
 import androidx.core.content.ContextCompat
@@ -48,8 +60,8 @@ import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.qr.QrContent
 import com.nos.motobitride.core.settings.AppSettings
+import com.nos.motobitride.R
 import com.nos.motobitride.core.settings.PermissionsHelper
-import com.nos.motobitride.core.settings.StartupBehavior
 import com.nos.motobitride.feature.ap.WifiApController
 import com.nos.motobitride.ui.components.MotobitTopAppBar
 import com.nos.motobitride.ui.i18n.AppLanguage
@@ -97,7 +109,9 @@ fun HudScreen(
     val statusText by (hudStreamController?.status ?: idleStatusFlow).collectAsState()
 
     val savedHud by SavedHud.current.collectAsState()
-    val startupBehavior by AppSettings.startup.collectAsState()
+    val autoConnect by AppSettings.autoConnect.collectAsState()
+    /** Annullamento dell'attesa automatica, valido solo per questa sessione app. */
+    var autoCancelled by remember { mutableStateOf(false) }
 
     val mediaProjectionManager = remember {
         if (isPreview) null
@@ -198,40 +212,33 @@ fun HudScreen(
 
     var startupApplied by remember { mutableStateOf(false) }
     if (!isPreview) {
-        LaunchedEffect(savedHud) {
-            if (startupApplied) return@LaunchedEffect
+        LaunchedEffect(savedHud, autoConnect, autoCancelled) {
+            if (startupApplied || autoCancelled) return@LaunchedEffect
             val hud = savedHud ?: return@LaunchedEffect
             startupApplied = true
 
             AppLog.i(
                 TAG_UI,
-                "Avvio: modalita' ${startupBehavior.name}, HUD memorizzato " +
-                        hud.displayName
+                "Avvio: connessione automatica=${autoConnect}, HUD ${hud.displayName}"
             )
 
-            when (startupBehavior) {
-                StartupBehavior.MANUAL -> Unit
-
-                StartupBehavior.AUTO_LINK -> {
-                    if (wifiController?.isHudConnected == false) {
-                        wifiController.connect(hud.toQrContent())
-                    }
-                }
-
-                StartupBehavior.AUTO_LINK_AND_STREAM -> {
-                    HudSession.requestStream()
-                    if (wifiController?.isHudConnected == false) {
-                        wifiController.connect(hud.toQrContent())
-                    }
-                    if (wifiController?.isHudConnected == true) {
-                        hudStreamController?.start()
-                    }
-                }
+            // In automatico si stabilisce SOLO la connessione: il video si
+            // avvia dal pulsante "Avvia mirroring".
+            if (autoConnect) {
+                HudSession.connect()
             }
         }
     }
 
-    val isActive = streamState != StreamState.IDLE && streamState != StreamState.ERROR
+    // Stati per i pulsanti: connessione separata dal mirroring.
+    val connected = streamState == StreamState.CONNECTED ||
+            streamState == StreamState.MIRRORING ||
+            streamState == StreamState.AWAITING_PROJECTION
+    val working = streamState == StreamState.DISCOVERING ||
+            streamState == StreamState.CONNECTING ||
+            streamState == StreamState.WAITING_HUD
+    val mirroring = streamState == StreamState.MIRRORING
+    val noBike = savedHud == null
     val linkConnected = wifiController?.isHudConnected ?: false
     val hudName = savedHud?.displayName ?: "-"
 
@@ -287,8 +294,8 @@ fun HudScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                     Text(
-                        text = AppTexts.get("settings_startup_title", currentLang) +
-                                ": " + AppTexts.get(startupBehavior.labelKey, currentLang),
+                        text = AppTexts.get("settings_auto_connect_title", currentLang) + ": " +
+                                (if (autoConnect) "ON" else "OFF"),
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
@@ -297,33 +304,27 @@ fun HudScreen(
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 Button(
                     onClick = {
-                        ctx.getActivity()?.let { act ->
+                        if (savedHud == null) {
+                            // Nessuna moto: il pulsante rosso apre la scansione.
+                            onShowQrScanner
+                        } else ctx.getActivity()?.let { act ->
                             when {
                                 ContextCompat.checkSelfPermission(
                                     ctx,
                                     Manifest.permission.NEARBY_WIFI_DEVICES
                                 ) == PackageManager.PERMISSION_GRANTED -> {
-                                    AppLog.i(TAG_UI, "Avvia premuto")
-                                    // Ricorda che l'utente vuole il video: al ritorno
-                                    // del link la sessione riparte da sola.
-                                    HudSession.requestStream()
-
-                                    val hud = savedHud
-                                    if (hud != null && wifiController?.isHudConnected == false) {
-                                        wifiController.connect(hud.toQrContent())
-                                    } else if (wifiController?.isHudConnected == true) {
-                                        hudStreamController?.setPreferredHost(
-                                            wifiController.hudIp,
-                                            WifiApController.DEFAULT_HUD_PORT
-                                        )
-                                        hudStreamController?.start()
-                                    } else {
+                                    AppLog.i(TAG_UI, "Connetti premuto")
+                                    if (savedHud == null) {
                                         AppLog.w(TAG_UI, "Nessun HUD: scansiona il QR")
                                         Toast.makeText(
                                             ctx,
                                             AppTexts.get("hud_no_saved", currentLang),
                                             Toast.LENGTH_SHORT
                                         ).show()
+                                    } else {
+                                        // Il pulsante CONNETTE e basta: il video
+                                        // parte con "Avvia mirroring".
+                                        HudSession.connect()
                                     }
                                 }
 
@@ -348,34 +349,73 @@ fun HudScreen(
                             }
                         }
                     },
-                    enabled = !isActive
-                ) {
-                    Text(
-                        if (streamState == StreamState.ERROR)
-                            AppTexts.get("common_retry", currentLang)
-                        else
-                            AppTexts.get("common_start", currentLang)
+                    modifier = Modifier.weight(1f),
+                    colors = ButtonDefaults.buttonColors(
+                        containerColor = when {
+                            noBike -> Color(0xFFE53935)
+                            working -> Color(0xFFF9A825)
+                            else -> Color(0xFF2E7D32)
+                        }
                     )
+                ) {
+                    if (noBike) {
+                        Icon(
+                            painter = painterResource(R.drawable.ic_qr),
+                            contentDescription = null,
+                            tint = Color.White
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    } else if (working) {
+                        CircularProgressIndicator(
+                            modifier = Modifier.size(16.dp),
+                            color = Color.White,
+                            strokeWidth = 2.dp
+                        )
+                        Spacer(Modifier.width(8.dp))
+                    } else if (connected) {
+                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
+                        Spacer(Modifier.width(8.dp))
+                    }
+                    Column(horizontalAlignment = Alignment.Start) {
+                        Text(
+                            text = when {
+                                noBike -> AppTexts.get("hud_connect_register", currentLang)
+                                working -> AppTexts.get("hud_connect_connecting", currentLang)
+                                connected -> AppTexts.get("hud_connect_connected", currentLang)
+                                else -> AppTexts.get("hud_connect_tap", currentLang)
+                            },
+                            color = Color.White
+                        )
+                        if (working) {
+                            Text(
+                                text = AppTexts.get("hud_tap_to_cancel", currentLang),
+                                style = MaterialTheme.typography.labelSmall,
+                                color = Color.White.copy(alpha = 0.9f)
+                            )
+                        }
+                    }
                 }
 
                 OutlinedButton(
                     onClick = {
-                        AppLog.i(TAG_UI, "Stop premuto")
-                        HudSession.stopStream()
+                        if (mirroring) {
+                            AppLog.i(TAG_UI, "Ferma mirroring")
+                            HudSession.stopStream()
+                        } else {
+                            AppLog.i(TAG_UI, "Avvia mirroring")
+                            HudSession.startStream()
+                        }
                     },
-                    enabled = isActive
+                    enabled = connected
                 ) {
-                    Text(AppTexts.get("common_stop", currentLang))
+                    Text(
+                        if (mirroring) AppTexts.get("hud_mirroring_stop", currentLang)
+                        else AppTexts.get("hud_mirroring_start", currentLang)
+                    )
                 }
             }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                OutlinedButton(
-                    onClick = onShowQrScanner
-                ) {
-                    Text(AppTexts.get("hud_scan_qr", currentLang))
-                }
-
                 OutlinedButton(
                     onClick = {
                         AppLog.i(TAG_UI, "Chiudi premuto")

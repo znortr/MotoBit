@@ -7,6 +7,7 @@ import android.os.Looper
 import android.os.VibrationEffect
 import android.os.Vibrator
 import android.os.VibratorManager
+import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.feature.ap.WifiApController
@@ -72,6 +73,15 @@ object HudSession {
     var wantsStream: Boolean = false
         private set
 
+    /**
+     * L'utente vuole la **connessione** con il TFT (link + sessione), a
+     * prescindere dal video. È il flag che tiene viva la riconnessione quando
+     * il mirroring è fermo.
+     */
+    @Volatile
+    var wantsConnection: Boolean = false
+        private set
+
     /** Crea (una sola volta) i controller e collega i flussi di stato. */
     fun ensure(context: Context) {
         if (initialized) return
@@ -92,7 +102,7 @@ object HudSession {
 
                     // Riconnessione immediata: azzera il backoff e fa partire
                     // subito il probe, invece di aspettare il timer (fino a 10 s).
-                    streamController.onLinkRestored(autoResume = wantsStream)
+                    streamController.onLinkRestored(autoConnect = wantsConnection)
                 },
                 onHudDisconnected = {
                     AppLog.w(TAG, "Link P2P perso: lo streaming resta in attesa")
@@ -199,25 +209,62 @@ object HudSession {
      */
     fun requestStream() {
         wantsStream = true
+        wantsConnection = true
     }
 
-    /** Avvia (o riprende) lo streaming e ricorda che l'utente lo vuole. */
+    /**
+     * Connette il TFT (link P2P + sessione) **senza** avviare il mirroring.
+     * Se il link è già attivo stabilisce solo la sessione.
+     */
+    fun connect() {
+        wantsConnection = true
+        val streamController = stream ?: return
+        val linkController = link ?: return
+        val qr = SavedHud.current.value?.toQrContent()
+
+        if (!linkController.isHudConnected) {
+            if (qr == null) {
+                AppLog.w(TAG, "connect(): nessun HUD memorizzato")
+                return
+            }
+            linkController.connect(qr)
+        } else {
+            streamController.setPreferredHost(
+                linkController.hudIp,
+                WifiApController.DEFAULT_HUD_PORT
+            )
+            streamController.connectOnly()
+        }
+    }
+
+    /** Avvia (o riprende) il mirroring e ricorda che l'utente lo vuole. */
     fun startStream() {
         wantsStream = true
+        wantsConnection = true
         stream?.start()
     }
 
-    /** Pausa richiesta dall'utente: la sessione resta viva, si ferma solo il video. */
+    /** Ferma il mirroring: sessione e link restano vivi (riconnessione attiva). */
     fun stopStream() {
         wantsStream = false
-        cancelActiveWaitTimer()
         stream?.stop()
-        appContext?.let { ScreenCaptureService.updateStatus(it, "In pausa") }
+        appContext?.let { ScreenCaptureService.updateStatus(it, "Connesso · video fermo") }
+    }
+
+    /** Disconnette il TFT: chiude sessione e link, l'app resta viva. */
+    fun disconnect() {
+        wantsConnection = false
+        wantsStream = false
+        cancelActiveWaitTimer()
+        stream?.close()
+        link?.disconnect()
+        appContext?.let { ScreenCaptureService.updateStatus(it, "Disconnesso") }
     }
 
     /** Chiusura completa (pulsante Chiudi): sessione, mirroring e link. */
     fun closeAll() {
         wantsStream = false
+        wantsConnection = false
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()

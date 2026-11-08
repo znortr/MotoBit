@@ -4,11 +4,8 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.selection.selectable
-import androidx.compose.foundation.selection.selectableGroup
 import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.RadioButton
 import androidx.compose.material3.Slider
 import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
@@ -20,12 +17,10 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.unit.dp
 import android.widget.Toast
 import androidx.compose.ui.platform.LocalContext
 import com.nos.motobitride.core.settings.AppSettings
-import com.nos.motobitride.core.settings.StartupBehavior
 import com.nos.motobitride.ui.i18n.AppTexts
 import kotlin.math.roundToInt
 
@@ -41,7 +36,7 @@ fun SettingsConnectionsScreen(
 ) {
     val ctx = LocalContext.current
     val currentLang by AppSettings.language.collectAsState()
-    val startup by AppSettings.startup.collectAsState()
+    val autoConnect by AppSettings.autoConnect.collectAsState()
     val vibrateOnConnect by AppSettings.vibrateOnConnect.collectAsState()
     val activeWaitMinutes by AppSettings.activeWaitMinutes.collectAsState()
 
@@ -52,40 +47,29 @@ fun SettingsConnectionsScreen(
         onBack = onBack
     ) {
         // ------------------------------------------------------------
-        // 1) Comportamento all'avvio
+        // 1) Connessione automatica (ex "comportamento all'avvio")
         // ------------------------------------------------------------
-        Text(
-            text = AppTexts.get("settings_startup_title", currentLang),
-            style = MaterialTheme.typography.titleSmall
-        )
-
-        Column(Modifier.selectableGroup()) {
-            StartupBehavior.entries.forEach { option ->
-                Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .selectable(
-                            selected = startup == option,
-                            onClick = { AppSettings.setStartup(option) },
-                            role = Role.RadioButton
-                        )
-                        .padding(vertical = 8.dp),
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    RadioButton(selected = startup == option, onClick = null)
-                    Column(Modifier.padding(start = 12.dp)) {
-                        Text(
-                            AppTexts.get(option.labelKey, currentLang),
-                            style = MaterialTheme.typography.bodyLarge
-                        )
-                        Text(
-                            AppTexts.get("${option.labelKey}_desc", currentLang),
-                            style = MaterialTheme.typography.bodySmall,
-                            color = MaterialTheme.colorScheme.onSurfaceVariant
-                        )
-                    }
-                }
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = AppTexts.get("settings_auto_connect_title", currentLang),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = AppTexts.get("settings_auto_connect_desc", currentLang),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
             }
+            Switch(
+                checked = autoConnect,
+                onCheckedChange = { AppSettings.setAutoConnect(it) }
+            )
         }
 
         HorizontalDivider()

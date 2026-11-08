@@ -57,6 +57,21 @@ object AppTexts {
         "settings_encoder_idle_title" to "Attesa attiva della riconnessione",
         "settings_encoder_idle_desc" to "Per quanti minuti l'app tenta attivamente di riconnettersi al TFT. Oltre la soglia passa in ascolto passivo: nessun tentativo, ma la riconnessione resta automatica appena il TFT torna.",
         "settings_active_wait_label" to "Attesa attiva: %d min",
+        // Pulsante grande di connessione (Home)
+        "hud_connect_register" to "Registra la moto",
+        "hud_connect_register_sub" to "Tocca per scansionare il QR del TFT",
+        "hud_connect_tap" to "Tocca per connettere",
+        "hud_connect_connecting" to "si sta connettendo…",
+        "hud_connect_waiting" to "In attesa del TFT…",
+        "hud_connect_connected" to "connessa",
+        "hud_connect_failed" to "Connessione non riuscita",
+        "hud_tap_to_cancel" to "tocca per annullare",
+        "hud_tap_to_cancel_manual" to "tocca per annullare e passare a manuale",
+        "hud_mirroring_start" to "Avvia mirroring",
+        "hud_mirroring_stop" to "Ferma mirroring",
+
+        "settings_auto_connect_title" to "Connessione automatica",
+        "settings_auto_connect_desc" to "All'avvio l'app resta in attesa e si connette da sola appena trova il TFT. Se disattivata, la connessione parte dal pulsante in Home.",
         "settings_vibrate_title" to "Vibrazione su connessione",
         "settings_vibrate_desc" to "Breve vibrazione quando il link con il TFT si connette o si perde. Utile con il telefono in tasca.",
 
@@ -204,6 +219,21 @@ object AppTexts {
         "settings_encoder_idle_title" to "Active reconnection wait",
         "settings_encoder_idle_desc" to "How many minutes the app actively tries to reconnect to the TFT. Beyond that it switches to passive listening: no attempts, but reconnection still happens automatically when the TFT returns.",
         "settings_active_wait_label" to "Active wait: %d min",
+        // Big connection button (Home)
+        "hud_connect_register" to "Register your bike",
+        "hud_connect_register_sub" to "Tap to scan the TFT QR code",
+        "hud_connect_tap" to "Tap to connect",
+        "hud_connect_connecting" to "connecting…",
+        "hud_connect_waiting" to "Waiting for the TFT…",
+        "hud_connect_connected" to "connected",
+        "hud_connect_failed" to "Connection failed",
+        "hud_tap_to_cancel" to "tap to cancel",
+        "hud_tap_to_cancel_manual" to "tap to cancel and switch to manual",
+        "hud_mirroring_start" to "Start mirroring",
+        "hud_mirroring_stop" to "Stop mirroring",
+
+        "settings_auto_connect_title" to "Automatic connection",
+        "settings_auto_connect_desc" to "On startup the app waits and connects by itself as soon as it finds the TFT. If disabled, connection starts from the button on Home.",
         "settings_vibrate_title" to "Vibrate on connection",
         "settings_vibrate_desc" to "Short vibration when the TFT link connects or is lost. Useful with the phone in your pocket.",
 

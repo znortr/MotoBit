@@ -26,7 +26,8 @@ enum class StartupBehavior(
 object AppSettings {
     private const val TAG = "AppSettings"
     private const val FILE = "motobit_settings"
-    private const val KEY_STARTUP = "startup_behavior"
+    private const val KEY_STARTUP = "startup_behavior"       // legacy (migrazione)
+    private const val KEY_AUTO_CONNECT = "auto_connect"
     // Chiave nuova: "attesa attiva" in MINUTI. Le vecchie chiavi
     // (encoder_idle_timeout_min / _sec) restano ignorate di proposito.
     private const val KEY_ACTIVE_WAIT_MIN = "active_wait_min"
@@ -86,6 +87,16 @@ object AppSettings {
     private val _startup = MutableStateFlow(StartupBehavior.MANUAL)
     val startup: StateFlow<StartupBehavior> = _startup.asStateFlow()
 
+    /**
+     * Connessione automatica (switch in Impostazioni → Connessioni).
+     *
+     * ON  = all'avvio l'app resta in attesa e si connette da sola appena
+     *       intercetta l'HUD.
+     * OFF = connessione manuale (default).
+     */
+    private val _autoConnect = MutableStateFlow(false)
+    val autoConnect: StateFlow<Boolean> = _autoConnect.asStateFlow()
+
     private val _language = MutableStateFlow(AppLanguage.ITALIANO)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
@@ -115,6 +126,14 @@ object AppSettings {
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
         _startup.value = StartupBehavior.fromStored(p.getString(KEY_STARTUP, null))
+        // Migrazione dal vecchio comportamento a 3 voci:
+        // AUTO_LINK / AUTO_LINK_AND_STREAM -> automatico, MANUAL -> manuale.
+        _autoConnect.value = if (p.contains(KEY_AUTO_CONNECT)) {
+            p.getBoolean(KEY_AUTO_CONNECT, false)
+        } else {
+            val old = p.getString(KEY_STARTUP, null)
+            old != null && old != StartupBehavior.MANUAL.name
+        }
         _language.value = AppLanguage.fromCode(p.getString(KEY_LANGUAGE, "it"))
         _themeMode.value = AppThemeMode.fromCode(p.getString(KEY_THEME_MODE, "dark"))
         _activeWaitMinutes.value = p.getInt(
@@ -148,7 +167,10 @@ object AppSettings {
 
         AppLog.i(TAG, "Lingua app: ${_language.value.code} (${_language.value.nameNative})")
         AppLog.i(TAG, "Tema app: ${_themeMode.value.code}")
-        AppLog.i(TAG, "Comportamento avvio: ${_startup.value.name}")
+        AppLog.i(
+            TAG,
+            "Connessione automatica: ${if (_autoConnect.value) "ON" else "OFF"}"
+        )
         AppLog.i(TAG, "Attesa attiva: ${_activeWaitMinutes.value} min")
         AppLog.i(TAG, "Push orologio all'avvio: ${_clockPushCount.value}")
         AppLog.i(TAG, "Keepalive orologio periodico (5 min): ${if (_periodicClockKeepalive.value) "ON" else "OFF"}")
@@ -197,6 +219,12 @@ object AppSettings {
         _startup.value = behavior
         prefs?.edit()?.putString(KEY_STARTUP, behavior.name)?.apply()
         AppLog.i(TAG, "Comportamento avvio -> ${behavior.name}")
+    }
+
+    fun setAutoConnect(enabled: Boolean) {
+        _autoConnect.value = enabled
+        prefs?.edit()?.putBoolean(KEY_AUTO_CONNECT, enabled)?.apply()
+        AppLog.i(TAG, "Connessione automatica -> ${if (enabled) "ON" else "OFF"}")
     }
 
     /** Numero di push (a 250ms) della raffica iniziale dell'ora al TFT. */

@@ -4,6 +4,50 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 2.1.0 — Connessione separata dal mirroring + connessione automatica
+
+**Data**: 2026-11-07 · **versionCode**: 2100
+
+### Cosa cambia per l'utente
+Ora **connettersi** e **trasmettere** sono due azioni distinte:
+
+| Pulsante | Azione |
+|---|---|
+| **Pulsante grande di connessione** | connette il TFT (link + sessione), **senza** avviare il video |
+| **Avvia / Ferma mirroring** | avvia o ferma solo il video; la sessione resta viva |
+| **Chiudi** | chiude tutto (invariato) |
+
+### Pulsante grande — macchina a stati
+| Stato | Colore | Testo |
+|---|---|---|
+| Nessuna moto | 🔴 rosso + icona QR | "Registra la moto" → apre la scansione |
+| Connessione in corso | 🟡 giallo + spinner | "si sta connettendo…" + "tocca per annullare" |
+| Connessa | 🟢 verde + ✓ | "«nome» connessa" (tocco: nessuna azione) |
+| Disconnessa (manuale) | 🟢 verde | "Tocca per connettere" |
+
+### Impostazioni → Connessioni
+Il selettore a 3 voci ("Manuale" / "Solo credenziali" / "Collega e trasmetti") è
+sostituito dallo **switch "Connessione automatica"** (default **OFF**):
+- **ON** → all'avvio l'app resta in attesa e si connette da sola
+- **OFF** → la connessione parte dal pulsante in Home
+- **Migrazione**: chi aveva uno dei due `AUTO_*` ritrova lo switch **ON**
+
+### Interno — separazione degli stati
+- Nuovo stato **`CONNECTED`**: sessione HUD pronta, video non avviato.
+- `HudStreamController.connectOnly()`: stabilisce la sessione senza creare encoder/VirtualDisplay.
+- `stop()` (Ferma mirroring) ora **non** spegne più la riconnessione: la sessione e il link
+  restano vivi e si autoripristinano se cadono. Prima `Stop` disattivava il retry.
+- `HudSession` espone `connect()`, `startStream()`, `stopStream()`, `disconnect()`;
+  nuovo flag `wantsConnection` distinto da `wantsStream`.
+
+### ⚠️ Da verificare (rischio noto)
+L'HU potrebbe chiudere una sessione su cui non arrivano frame (`MediaCtrlInit` +
+`VideoStart` senza video). Test: **connetti senza avviare il mirroring** e osserva
+2-3 minuti. Se l'HU chiude, si aggiungerà un frame di cortesia o l'avvio automatico
+del video dopo N secondi.
+
+---
+
 ## 🎨 2.0.6 — Cattura sempre a schermo intero
 
 **Data**: 2026-11-07 · **versionCode**: 2006
