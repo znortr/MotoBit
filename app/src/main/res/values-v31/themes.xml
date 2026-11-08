@@ -2,13 +2,13 @@
 <resources>
 
     <!--
-        Splash NATIVA di Android 12+ (SplashScreen API): mostrata dal sistema
-        appena l'app parte, senza doppia fase. Icona = simbolo dell'app.
+        Android 12+ mostra la sua splash di sistema: la si tiene NERA, senza
+        icona, per non mostrare nulla di sbagliato. (Una splash personalizzata
+        e' annotata nel TODO a priorita' molto bassa.)
     -->
-    <style name="Theme.MotobitRide.Splash" parent="Theme.MotobitRide">
+    <style name="Theme.MotobitRide" parent="android:Theme.Material.Light.NoActionBar">
+        <item name="android:windowBackground">@color/splash_background</item>
         <item name="android:windowSplashScreenBackground">@color/splash_background</item>
-        <item name="android:windowSplashScreenAnimatedIcon">@drawable/ic_launcher_foreground</item>
-        <item name="android:windowSplashScreenIconBackgroundColor">@color/splash_background</item>
     </style>
 
 </resources>

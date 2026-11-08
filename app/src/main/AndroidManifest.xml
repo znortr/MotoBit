@@ -81,7 +81,7 @@
         <activity
             android:name=".MainActivity"
             android:exported="true"
-            android:theme="@style/Theme.MotobitRide.Splash">
+            android:theme="@style/Theme.MotobitRide">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
 

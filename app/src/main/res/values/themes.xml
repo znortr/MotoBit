@@ -2,18 +2,12 @@
 <resources>
 
     <!--
-        Tema base. `windowBackground` scuro: evita il lampo bianco sia all'avvio
-        sia durante i passaggi tra schermate (l'app è scura).
+        Tema unico dell'app.
+        `windowBackground` scuro: la schermata di avvio e le transizioni sono
+        nere, senza il lampo bianco del tema Light di default.
     -->
     <style name="Theme.MotobitRide" parent="android:Theme.Material.Light.NoActionBar">
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
-
-    <!--
-        Tema della sola finestra di avvio.
-        Su Android 12+ l'aspetto della splash è definito in `values-v31`
-        (sfondo + icona). Sotto la 12 resta lo sfondo scuro.
-    -->
-    <style name="Theme.MotobitRide.Splash" parent="Theme.MotobitRide" />
 
 </resources>

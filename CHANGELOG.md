@@ -4,6 +4,28 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🧹 2.1.6 — Splash rimossa: resta solo lo schermo nero
+
+**Data**: 2026-11-07 · **versionCode**: 2106
+
+La splash personalizzata non funziona come deve (due fasi o icona di sistema
+non gradita). **Decisione: niente splash**, solo sfondo nero. Annotata nel
+`TODO.md` §13 a **priorità molto bassa**.
+
+### Cosa è stato tolto
+- tema `Theme.MotobitRide.Splash` (manifest → `Theme.MotobitRide`)
+- `windowSplashScreenAnimatedIcon` / `windowSplashScreenIconBackgroundColor`
+- `drawable/splash_background.xml` (layer-list inutilizzato)
+- `setTheme(...)` in `MainActivity` (non più necessario)
+
+### Cosa resta
+- `Theme.MotobitRide`: `windowBackground` = `@color/splash_background` (`#0B0B0D`)
+- `values-v31`: anche `windowSplashScreenBackground` nero, **senza icona**
+
+**Risultato**: avvio su schermo nero, senza lampi bianchi, senza nulla di finto.
+
+---
+
 ## 🎨 2.1.5 — Splash nativa (una sola fase): rimosso l'overlay in-app
 
 **Data**: 2026-11-07 · **versionCode**: 2105

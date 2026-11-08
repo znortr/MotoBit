@@ -421,6 +421,32 @@ stato in `labelMedium`, riga "progressioni" in `labelSmall`.
 
 ---
 
+## 13. Splash di avvio personalizzata — **PRIORITÀ MOLTO BASSA**
+
+**Decisione (07/11/2026)**: si lascia **solo lo schermo nero**. Togliere l'immagine
+(due fasi sbagliate) e l'icona di sistema. Da non riprendere salvo richiesta.
+
+### Stato attuale (2.1.6)
+- `Theme.MotobitRide`: `windowBackground` = `@color/splash_background` (`#0B0B0D`)
+- `values-v31`: anche `windowSplashScreenBackground` nero, **senza icona**
+- Nessuna immagine, nessun overlay, nessun ritardo
+
+### Cosa è stato provato e perché non andava
+| Tentativo | Esito |
+|---|---|
+| `windowBackground` con l'immagine | Su Android 12+ la splash di sistema la copre: non si vede (nero) |
+| PNG in `drawable/` | Scalato ~2,6× dalla densità (2237×4845 px): inutilizzabile |
+| `SplashOverlay` in-app 750 ms | **Due fasi**: prima Android, poi l'immagine → sbagliato |
+| `windowSplashScreenAnimatedIcon` = icona app | Funziona ma non piace / non convince |
+
+### Se un giorno si volesse riprovare
+Serve un **vector drawable quadrato** (es. 108×108) con il logo “MotoBit”
+bianco/arancione da puntare in `windowSplashScreenAnimatedIcon`; la struttura
+del tema è ancora pronta. L'immagine `ic_splash_strtup.png` (852×1846) **non è
+adatta** alla splash di sistema, che mostra l'icona inun cerchio.
+
+---
+
 ## ✅ Chiusi / spiegati
 
 ### Notifica di mirroring persistente a app chiusa — **corretto in 2.0.3**

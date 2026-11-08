@@ -17,12 +17,6 @@ import com.nos.motobitride.ui.theme.MotobitRideTheme
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Il manifest assegna Theme.MotobitRide.Splash solo alla finestra di
-        // avvio. Prima di creare la finestra si torna al tema normale: lo
-        // splash e' gestito dal sistema (SplashScreen API su Android 12+) e
-        // non resta come sfondo dell'Activity.
-        setTheme(R.style.Theme_MotobitRide)
-
         super.onCreate(savedInstanceState)
 
         // Impostazioni, HUD memorizzato e profilo veicolo vanno caricati prima della UI
