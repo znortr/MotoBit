@@ -7,7 +7,12 @@ Ultimo aggiornamento: 2026-11-06 · versione corrente: **1.2.8 (1208)**
 
 ---
 
-## 1. Garage — restyling a card *(richiesto, prossimo lavoro)*
+## 1. ✅ Garage — restyling a card *(FATTO in 2.0.1 → 2.0.5)*
+
+> Implementato: una sola card con nome (H1) + targa (H2), modifica in dialog con
+> matita, pulsanti **Scadenze** e **Info tecniche** (stile Impostazioni),
+> **Dimentica** in fondo con conferma che cancella anche i dati in memoria.
+> MAC TFT reso persistente. Restano solo le voci sotto, non bloccanti.
 
 Layout richiesto, dall'alto in basso:
 
@@ -47,7 +52,11 @@ Note:
 
 ---
 
-## 2. Scadenze veicolo: Google Calendar o notifica dell'app?
+## 2. ✅ Scadenze veicolo *(DECISO: opzione B — solo notifiche; FATTO in 1.3.0)*
+
+> Google Calendar **scartato**. Implementate 3 scadenze (revisione, tassa,
+> assicurazione) con mese + giorno, notifiche WorkManager con Posponi/Elimina,
+> preavviso configurabile. La sezione sotto resta come documentazione della scelta.
 
 ### Le strade possibili
 
@@ -127,7 +136,10 @@ Varianti:
 
 ---
 
-## 3. Veicoli multipli (memorizzare e riusare più connessioni)
+## 3. Veicoli multipli (memorizzare e riusare più connessioni) — **PROSSIMO**
+
+> ✅ Prerequisito pronto: il Garage è ora una card unica, quindi una lista di
+> veicoli non richiede un ridisegno.
 
 - [ ] Poter salvare **più veicoli**, ognuno con: nome, targa, mesi di scadenza,
       SSID/MAC/HU del QR associato.
@@ -368,6 +380,18 @@ impercettibile; con video è evidente. Il caso d'uso reale è la mappa.
 ---
 
 ## ✅ Chiusi / spiegati
+
+### Notifica di mirroring persistente a app chiusa — **corretto in 2.0.3**
+`updateStatus()` ricreava la notifica dopo `stopService` (via
+`onTaskRemoved` → `closeAll` → `notify`). Aggiunto il flag `running` e
+annullamento esplicito in `onDestroy`/`stopService`; in `HudScreen` prima
+`stopService`, poi `closeAll`.
+
+### MAC del TFT non persistente — **corretto in 2.0.4 / 2.0.5**
+`SavedHud.save(qr)` riscriveva `mac = qr.mac`: se il QR non lo conteneva, il MAC
+appreso da `updateMac` veniva azzerato a ogni ritorno in Home. Ora `save()`
+conserva il MAC precedente a parità di SSID. In più "Dimentica" azzera anche il
+`savedQr` in memoria (`HudSession.closeAll`) oltre ai dati su disco.
 
 ### Freeze del video sul telefono alla disconnessione — **non è un bug nostro**
 
