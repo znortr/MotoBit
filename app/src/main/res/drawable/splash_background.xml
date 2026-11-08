@@ -1,17 +1,14 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!--
-    Sfondo della schermata di avvio (starting window).
-    Colore pieno scuro + immagine di splash a tutto schermo: sostituisce la
-    fastidiosa schermata bianca di default.
+    Sfondo della finestra di avvio: solo colore pieno.
+
+    L'immagine NON va qui: su Android 12+ la splash di sistema copre il
+    windowBackground e l'immagine non verrebbe mai disegnata (si vedrebbe solo
+    il nero). L'immagine è mostrata dall'overlay in-app in `DaemonApp`
+    (SplashOverlay), che funziona su tutte le versioni.
 -->
 <layer-list xmlns:android="http://schemas.android.com/apk/res/android">
 
     <item android:drawable="@color/splash_background" />
-
-    <item>
-        <bitmap
-            android:gravity="fill"
-            android:src="@drawable/ic_splash_strtup" />
-    </item>
 
 </layer-list>

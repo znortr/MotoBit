@@ -4,6 +4,34 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.1.4 — La splash ora si vede davvero (overlay in-app) e non deforma
+
+**Data**: 2026-11-07 · **versionCode**: 2104
+
+### Perché in 2.1.3 si vedeva solo nero
+Due cause sovrapposte:
+1. **Android 12+** mostra la **sua** splash sopra la finestra e l'app disegna il primo
+   frame subito: il `windowBackground` con l'immagine **non viene mai mostrato**
+   (restava solo il colore scuro = schermo nero).
+2. Il PNG era in `drawable/` (trattato come mdpi) → **scalato di ~2,6×** a 2237×4845 px:
+   bitmap enorme, inutilizzabile come sfondo di finestra.
+
+### Soluzione
+| Intervento | Dettaglio |
+|---|---|
+| Immagine spostata in **`drawable-nodpi/`** | nessuna scalatura automatica per densità |
+| `splash_background.xml` | ora **solo colore** (l'immagine non serve più lì) |
+| **`SplashOverlay()`** in `DaemonApp` | overlay Compose a schermo pieno: `Image` con **`ContentScale.Fit`** → **nessuna deformazione e nessun taglio**, sfondo `#0B0B0D` |
+| Durata | 750 ms + dissolvenza in uscita di 250 ms |
+| Tema `Theme.MotobitRide.Splash` | resta per evitare il lampo bianco all'avvio |
+
+### Sequenza
+splash di sistema (scura, brevissima) → **immagine di splash** → app
+
+Funziona identico su Android 12+ e precedenti.
+
+---
+
 ## 🎨 2.1.3 — Splash di avvio personalizzata (niente più schermata bianca)
 
 **Data**: 2026-11-07 · **versionCode**: 2103
