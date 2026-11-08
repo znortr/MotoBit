@@ -55,6 +55,7 @@ import com.nos.motobitride.core.garage.VehicleDeadline
 import com.nos.motobitride.core.garage.VehicleStore
 import com.nos.motobitride.core.garage.vehicleDisplayName
 import com.nos.motobitride.core.hud.HudSession
+import com.nos.motobitride.core.hud.ScreenCaptureService
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.qr.QrContent
 import com.nos.motobitride.core.settings.AppSettings
@@ -246,9 +247,17 @@ fun GarageScreen(
             lang = currentLang,
             onDismiss = { showForgetConfirm = false },
             onConfirm = {
-                // Cancella TUTTO: connessione, nome, targa, scadenze e avvisi.
+                // Cancella TUTTO: dati persistiti E stato in memoria.
+                //  - SavedHud contiene anche il MAC: sparisce con lui
+                //  - VehicleStore: nome, targa, scadenze
+                //  - closeAll(): `WifiApController.savedQr` vivo in HudSession
+                //    contiene ancora il MAC della moto dimenticata; senza questo
+                //    il link potrebbe riconnettersi in background
+                //  - stopService: se stava trasmettendo, chiude anche il servizio
                 SavedHud.clear()
                 VehicleStore.clear()
+                HudSession.closeAll()
+                ScreenCaptureService.stopService(ctx)
                 DeadlineKind.entries.forEach { DeadlineNotifications.cancel(ctx, it) }
                 showForgetConfirm = false
             }

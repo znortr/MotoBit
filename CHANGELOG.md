@@ -4,6 +4,34 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.0.5 — "Dimentica" cancella anche il MAC in memoria
+
+**Data**: 2026-11-07 · **versionCode**: 2005
+
+### Cosa era già corretto
+Il **MAC vive dentro `SavedHudData`**, lo stesso JSON di SSID/nome/modello/S-N.
+`SavedHud.clear()` rimuove l'intera chiave `profile`/`hud`: quindi il MAC viene
+**già cancellato** da `SharedPreferences` e non sopravvive al riavvio.
+Il MAC è quindi **legato alla moto salvata** (l'SSID ne è la chiave: due moto
+diverse non se lo scambiano, e il merge del 2.0.4 si applica solo a parità di SSID).
+
+### Il pezzo mancante (corretto ora)
+`WifiApController.savedQr` è **in memoria** dentro `HudSession` (vita di processo)
+e contiene anche il MAC. Dopo "Dimentica", il link poteva **ancora riconnettersi**
+alla moto dimenticata usando quel dato, che invece non esisteva più su disco.
+
+**Fix** — `onConfirm` di "Dimentica" ora fa anche:
+```kotlin
+HudSession.closeAll()                 // stream chiuso + savedQr in memoria azzerato
+ScreenCaptureService.stopService(ctx) // se stava trasmettendo, chiude il servizio
+```
+
+### Risultato
+Dopo "Dimentica": nessun dato su disco, nessun dato in memoria, nessun tentativo
+di riconnessione alla moto dimenticata, notifiche di scadenza annullate.
+
+---
+
 ## 🐛 2.0.4 — Il MAC del TFT ora è davvero persistente
 
 **Data**: 2026-11-07 · **versionCode**: 2004
