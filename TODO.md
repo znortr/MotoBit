@@ -397,6 +397,30 @@ non offre più "app singola", che romperebbe il cambio app a mirroring attivo.
 
 ---
 
+## 12. Revisione grafica della Home (pulsante di connessione)
+
+**Feedback utente (07/11/2026)**: *il funzionamento è quello aspettato, la grafica e i
+colori lasciano molto a desiderare* → da rivedere in un secondo momento.
+
+Stato attuale (2.1.2): pulsante full width alto 140 dp, angoli 18 dp, ombra 6 dp,
+tre colori pieni `#D32F2F` / `#F9A825` / `#2E7D32`, nome in `titleLarge` bold +
+stato in `labelMedium`, riga "progressioni" in `labelSmall`.
+
+- [ ] **Palette**: i tre colori sono "a semaforo". Valutare colori coerenti col tema
+      Material 3 (`primary` / `tertiary` / `error`) o una scala derivata dall'icona dell'app.
+- [ ] **Forma e ombra**: rivedere corner radius ed elevazione; valutare un gradiente
+      verticale tenue invece del colore piatto.
+- [ ] **Tipografia**: dimensioni e pesi del nome e dello stato.
+- [ ] **Riga progressioni**: sostituire il testo con **micro-icone** (link, wifi,
+      risoluzione) + valori, più leggibile a colpo d'occhio.
+- [ ] **Animazione di lavoro**: pulsazione del bordo o shimmer sulla seconda riga,
+      al posto del solo spinner.
+- [ ] **Icona catena spezzata** (`ic_link_off`): verificare la leggibilità a 28 dp.
+- [ ] Valutare se, a pulsante validato, **rimuovere la card informazioni** in cima
+      (le progressioni sono già dentro il pulsante).
+
+---
+
 ## ✅ Chiusi / spiegati
 
 ### Notifica di mirroring persistente a app chiusa — **corretto in 2.0.3**
