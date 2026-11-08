@@ -14,6 +14,8 @@ import android.view.Gravity
 import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
+import android.widget.FrameLayout
+import android.widget.ProgressBar
 import android.widget.TextView
 import androidx.core.app.NotificationCompat
 import com.nos.motobitride.R
@@ -83,6 +85,10 @@ class StartBubbleService : Service() {
     private var params: WindowManager.LayoutParams? = null
     private var targetPackage: String = ""
 
+    private var bubbleText: TextView? = null
+    private var bubbleSpinner: ProgressBar? = null
+    private var working = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -121,18 +127,45 @@ class StartBubbleService : Service() {
         val size = (56 * resources.displayMetrics.density).toInt()
         val margin = (16 * resources.displayMetrics.density).toInt()
 
-        val view = TextView(this).apply {
+        val density = resources.displayMetrics.density
+
+        val label = TextView(this).apply {
             text = "AVVIA"
             setTextColor(Color.WHITE)
             textSize = 12f
             gravity = Gravity.CENTER
             setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+
+        val spinnerView = ProgressBar(this).apply {
+            isIndeterminate = true
+            indeterminateTintList = android.content.res.ColorStateList.valueOf(Color.WHITE)
+            visibility = View.GONE
+            layoutParams = FrameLayout.LayoutParams(
+                (22 * density).toInt(),
+                (22 * density).toInt(),
+                Gravity.CENTER
+            )
+        }
+
+        val view = FrameLayout(this).apply {
             background = GradientDrawable().apply {
                 shape = GradientDrawable.OVAL
                 setColor(Color.parseColor("#F9A825"))
-                setStroke((2 * resources.displayMetrics.density).toInt(), Color.parseColor("#33FFFFFF"))
+                setStroke((2 * density).toInt(), Color.parseColor("#33FFFFFF"))
             }
+            addView(
+                label,
+                FrameLayout.LayoutParams(
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    FrameLayout.LayoutParams.MATCH_PARENT,
+                    Gravity.CENTER
+                )
+            )
+            addView(spinnerView)
         }
+        bubbleText = label
+        bubbleSpinner = spinnerView
 
         val layoutParams = WindowManager.LayoutParams(
             size,
@@ -204,8 +237,20 @@ class StartBubbleService : Service() {
         }
     }
 
+    /**
+     * Mostra lo spinner al posto della scritta mentre consenso + connessione
+     * sono in corso (la bolla sparisce da sola al `MIRRORING`).
+     */
+    private fun setWorking(value: Boolean) {
+        if (working == value) return
+        working = value
+        bubbleText?.visibility = if (value) View.GONE else View.VISIBLE
+        bubbleSpinner?.visibility = if (value) View.VISIBLE else View.GONE
+    }
+
     private fun onBubbleTap() {
         AppLog.i(TAG, "Bolla AVVIA premuta")
+        setWorking(true)
         runCatching {
             startActivity(
                 StreamLaunchActivity.intent(
@@ -224,11 +269,14 @@ class StartBubbleService : Service() {
         if (watcher != null) return
         watcher = scope.launch {
             while (isActive) {
-                val state = HudSession.stream?.state?.value
-                if (state == StreamState.MIRRORING) {
-                    AppLog.i(TAG, "Mirroring attivo: rimuovo la bolla")
-                    stopSelf()
-                    return@launch
+                when (HudSession.stream?.state?.value) {
+                    StreamState.MIRRORING -> {
+                        AppLog.i(TAG, "Mirroring attivo: rimuovo la bolla")
+                        stopSelf()
+                        return@launch
+                    }
+                    StreamState.IDLE, StreamState.ERROR, null -> setWorking(false)
+                    else -> setWorking(true)
                 }
                 delay(600)
             }

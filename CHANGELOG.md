@@ -4,6 +4,43 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 2.2.1 — Un tocco: consenso e connessione in parallelo + spinner nella bolla
+
+**Data**: 2026-11-07 · **versionCode**: 2201
+
+### Prima
+```
+tap AVVIA → attesa connessione (5-15 s) → conferma → consenso → streaming
+```
+Il dialogo del consenso si **sommava** all'attesa.
+
+### Ora
+```
+tap AVVIA → conferma → ┐ consenso Android
+tap AVVIA → conferma → ┘ connessione TFT   (in parallelo)
+          → appena entrambi pronti: streaming (+ apertura app)
+```
+Il dialogo di conferma compare **subito**, senza attendere la connessione.
+L'avvio effettivo scatta quando `confirmed && projection != null && connected`.
+
+### Bolla AVVIA
+- Durante tutto il processo la bolla mostra uno **spinner bianco** al posto della
+  scritta (feedback immediato che sta lavorando).
+- Torna "AVVIA" se il flusso si annulla (`IDLE`/`ERROR`).
+- **Sparisce** appena lo stato diventa `MIRRORING`.
+
+### Annullamento
+Se l'utente annulla e la connessione era stata avviata da questo flusso
+(scenario 2), viene chiusa (`HudSession.disconnect()`) così la bolla torna
+pronta per un nuovo tentativo. Nello scenario 1 (TFT già connesso) la
+connessione resta.
+
+### Invariato
+`WifiApController`, `HudStreamController`, `HudSession`, `SavedHud`,
+`ScreenCaptureService`, protocollo, libreria Go.
+
+---
+
 ## 🚀 2.2.0 — Home launcher: griglia app + avvio mirroring dall'app
 
 **Data**: 2026-11-07 · **versionCode**: 2200

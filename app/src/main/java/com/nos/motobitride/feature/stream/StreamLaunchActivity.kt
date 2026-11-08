@@ -11,7 +11,6 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.padding
@@ -34,6 +33,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
 import com.nos.motobitride.core.apps.InstalledApps
+import com.nos.motobitride.core.apps.SavedApps
 import com.nos.motobitride.core.hud.HudSession
 import com.nos.motobitride.core.hud.ScreenCaptureService
 import com.nos.motobitride.core.hud.StreamState
@@ -42,23 +42,24 @@ import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.ui.theme.MotobitRideTheme
 import kotlinx.coroutines.flow.MutableStateFlow
-import com.nos.motobitride.core.apps.SavedApps
 
 /**
- * Activity **trasparente** che orchestra l'avvio del mirroring.
+ * Activity **trasparente** che orchestra l'avvio del mirroring con **un solo
+ * tocco** (sulla bolla o sull'app).
  *
- * Non mostra nessuna schermata dell'app: solo due dialoghi (connessione in
- * corso / conferma). Serve perché il consenso MediaProjection su Android 12+
- * può essere chiesto **solo da un'Activity visibile**, e perché così l'app
- * scelta resta dietro senza riportare in primo piano la Home di MotoBit.
- *
- * Riusa integralmente il sistema esistente: `HudSession` (link + sessione) e
- * `ScreenCaptureService` (cattura). Nessuna logica di protocollo qui.
+ * Ordine ottimizzato:
+ * ```
+ * conferma → consenso Android ┐
+ *            connessione TFT  ┘ in parallelo
+ *            → appena entrambi pronti: streaming (+ apertura app)
+ * ```
+ * Così il dialogo del consenso non si somma ai 5-15 s di connessione.
+ * Riusa integralmente `HudSession` e `ScreenCaptureService`: nessuna logica di
+ * protocollo qui.
  */
 class StreamLaunchActivity : ComponentActivity() {
 
     companion object {
-        private const val TAG = "StreamLaunch"
         private const val EXTRA_PACKAGE = "extra_package"
         private const val EXTRA_OPEN_APP = "extra_open_app"
 
@@ -112,22 +113,13 @@ private fun StreamLaunchScreen(
             streamState == StreamState.MIRRORING ||
             streamState == StreamState.AWAITING_PROJECTION
 
-    var connectRequested by remember { mutableStateOf(false) }
-    var showConfirm by remember { mutableStateOf(false) }
-
     val hasHud = SavedHud.current.value != null
 
-    // Connessione: richiesta una sola volta; se già connesso si passa subito
-    // al dialogo di conferma.
-    LaunchedEffect(connected) {
-        if (connected) {
-            showConfirm = true
-        } else if (!connectRequested) {
-            connectRequested = true
-            AppLog.i("StreamLaunch", "Connessione al TFT richiesta")
-            HudSession.connect()
-        }
-    }
+    var confirmed by remember { mutableStateOf(false) }
+    var cancelled by remember { mutableStateOf(false) }
+
+    /** Connessione già avviata da questa schermata (per il rollback su annulla). */
+    var connectStartedHere by remember { mutableStateOf(false) }
 
     val consentLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
@@ -135,29 +127,20 @@ private fun StreamLaunchScreen(
         if (result.resultCode == Activity.RESULT_OK && result.data != null) {
             AppLog.i("StreamLaunch", "Consenso cattura concesso")
             ScreenCaptureService.startService(ctx, result.resultCode, result.data!!)
-            HudSession.startStream()
-            if (openApp) InstalledApps.launch(ctx, packageName)
-            onFinish()
+            // Lo streaming parte dall'effetto qui sotto, appena c'è la proiezione
+            // e la connessione è pronta.
         } else {
-            AppLog.w("StreamLaunch", "Consenso cattura negato: mirroring non avviato")
+            AppLog.w("StreamLaunch", "Consenso negato: mirroring non avviato")
+            cancelled = true
+            rollbackIfNeeded(openApp, connectStartedHere)
             onFinish()
         }
     }
 
-    fun startMirroring() {
-        if (projection != null) {
-            AppLog.i("StreamLaunch", "Proiezione già attiva: avvio diretto")
-            HudSession.startStream()
-            if (openApp) InstalledApps.launch(ctx, packageName)
-            onFinish()
-            return
-        }
+    fun requestConsentIfNeeded() {
+        if (projection != null) return
         val manager = ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE)
-                as? MediaProjectionManager
-        if (manager == null) {
-            onFinish()
-            return
-        }
+                as? MediaProjectionManager ?: return
         val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
             manager.createScreenCaptureIntent(
                 MediaProjectionConfig.createConfigForDefaultDisplay()
@@ -166,6 +149,34 @@ private fun StreamLaunchScreen(
             manager.createScreenCaptureIntent()
         }
         consentLauncher.launch(intent)
+    }
+
+    fun onConfirm() {
+        confirmed = true
+        AppLog.i("StreamLaunch", "Confermato: consenso + connessione in parallelo")
+        // Consenso (se serve) e connessione partono insieme.
+        requestConsentIfNeeded()
+        if (!connected) {
+            connectStartedHere = true
+            HudSession.connect()
+        }
+    }
+
+    fun onDismissFlow() {
+        cancelled = true
+        rollbackIfNeeded(openApp, connectStartedHere)
+        onFinish()
+    }
+
+    // Avvio effettivo: serve conferma + proiezione pronta + connessione pronta.
+    LaunchedEffect(confirmed, connected, projection) {
+        if (!confirmed || cancelled) return@LaunchedEffect
+        if (projection == null || !connected) return@LaunchedEffect
+
+        AppLog.i("StreamLaunch", "Pronto: avvio mirroring")
+        HudSession.startStream()
+        if (openApp) InstalledApps.launch(ctx, packageName)
+        onFinish()
     }
 
     when {
@@ -177,27 +188,40 @@ private fun StreamLaunchScreen(
             onDismiss = onFinish
         )
 
-        showConfirm -> SimpleDialog(
+        !confirmed -> SimpleDialog(
             title = "Avvia mirroring?",
             message = if (openApp && packageName.isNotBlank())
                 "La trasmissione verso il TFT verrà avviata e poi si aprirà l'app scelta."
             else
                 "La trasmissione verso il TFT verrà avviata.",
             confirm = "Avvia",
-            onConfirm = { startMirroring() },
+            onConfirm = { onConfirm() },
             dismiss = "Annulla",
-            onDismiss = onFinish
+            onDismiss = { onDismissFlow() }
         )
 
-        else -> WaitingDialog(onCancel = onFinish)
+        else -> WaitingDialog(
+            message = "Consenso e connessione al TFT in corso…",
+            onCancel = { onDismissFlow() }
+        )
+    }
+}
+
+/** Se la connessione è stata avviata da questa schermata e non si trasmette, la si chiude. */
+private fun rollbackIfNeeded(openApp: Boolean, connectStartedHere: Boolean) {
+    if (openApp || !connectStartedHere) return
+    val state = HudSession.stream?.state?.value
+    if (state != StreamState.MIRRORING) {
+        AppLog.i("StreamLaunch", "Annullato: chiudo la connessione avviata qui")
+        runCatching { HudSession.disconnect() }
     }
 }
 
 @Composable
-private fun WaitingDialog(onCancel: () -> Unit) {
+private fun WaitingDialog(message: String, onCancel: () -> Unit) {
     AlertDialog(
         onDismissRequest = onCancel,
-        title = { Text("Connessione al TFT") },
+        title = { Text("Avvio in corso") },
         text = {
             Row(verticalAlignment = Alignment.CenterVertically) {
                 CircularProgressIndicator(
@@ -205,10 +229,7 @@ private fun WaitingDialog(onCancel: () -> Unit) {
                     strokeWidth = 2.dp
                 )
                 Spacer(Modifier.width(14.dp))
-                Text(
-                    text = "Attendo che la moto risponda…",
-                    style = MaterialTheme.typography.bodyMedium
-                )
+                Text(text = message, style = MaterialTheme.typography.bodyMedium)
             }
         },
         confirmButton = {
@@ -240,9 +261,7 @@ private fun SimpleDialog(
             TextButton(onClick = onConfirm) { Text(confirm) }
         },
         dismissButton = if (dismiss != null) {
-            {
-                TextButton(onClick = onDismiss) { Text(dismiss) }
-            }
+            { TextButton(onClick = onDismiss) { Text(dismiss) } }
         } else null
     )
 }
