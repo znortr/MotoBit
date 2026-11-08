@@ -4,6 +4,35 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.0.6 — Cattura sempre a schermo intero
+
+**Data**: 2026-11-07 · **versionCode**: 2006
+
+### Sintomo
+All'avvio della cattura Android 14+ mostrava il dialog con la scelta **"un'app"**
+vs **"schermo intero"**. Scegliendo "un'app" il TFT mostrerebbe solo quella, e
+sarebbe impossibile cambiare app con il mirroring attivo.
+
+### Fix
+Su Android 14+ (`API 34`) si crea l'intent con
+`MediaProjectionConfig.createConfigForDefaultDisplay()`:
+il dialog di sistema **non offre più l'opzione app singola**, la cattura è sempre
+sullo schermo intero. Su versioni precedenti resta l'intent classico.
+
+```kotlin
+val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+    manager.createScreenCaptureIntent(MediaProjectionConfig.createConfigForDefaultDisplay())
+} else {
+    manager.createScreenCaptureIntent()
+}
+```
+
+### Invariato
+Tasto "Avvia"/"Stop"/"Chiudi" **non toccati** in questa versione: la separazione
+connetti/mirroring e il pulsante grande di connessione arriveranno in commit dedicati.
+
+---
+
 ## 🐛 2.0.5 — "Dimentica" cancella anche il MAC in memoria
 
 **Data**: 2026-11-07 · **versionCode**: 2005

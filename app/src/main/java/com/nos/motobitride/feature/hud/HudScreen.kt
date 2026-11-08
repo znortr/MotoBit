@@ -5,6 +5,7 @@ import android.app.Activity
 import android.content.Context
 import android.content.ContextWrapper
 import android.content.pm.PackageManager
+import android.media.projection.MediaProjectionConfig
 import android.media.projection.MediaProjectionManager
 import android.os.Build
 import android.widget.Toast
@@ -131,7 +132,19 @@ fun HudScreen(
         projectionRequested = true
         try {
             AppLog.i(TAG_UI, "Richiesta consenso cattura schermo")
-            mediaProjectionManager?.let { screenCaptureLauncher.launch(it.createScreenCaptureIntent()) }
+            val manager = mediaProjectionManager ?: return
+
+            // Android 14+: il dialog di sistema propone "un'app" o "schermo
+            // intero". Al TFT serve TUTTO lo schermo, quindi si forza il display
+            // di default: il dialog non offre piu' l'opzione app singola.
+            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
+                manager.createScreenCaptureIntent(
+                    MediaProjectionConfig.createConfigForDefaultDisplay()
+                )
+            } else {
+                manager.createScreenCaptureIntent()
+            }
+            screenCaptureLauncher.launch(intent)
         } catch (t: Throwable) {
             projectionRequested = false
             AppLog.e(TAG_UI, "Impossibile aprire il dialog di cattura", t)

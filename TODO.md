@@ -379,6 +379,24 @@ impercettibile; con video è evidente. Il caso d'uso reale è la mappa.
 
 ---
 
+## 11. Scorciatoie app di navigazione + pulsante generale di mirroring
+
+**Requisito utente (07/11/2026)**, da fare dopo la separazione connetti / mirroring.
+
+- [ ] **Pulsante generale** nella Home del telefono per far partire il mirroring.
+- [ ] **Collegamento a più app di navigazione**: una serie di icone (Maps, Waze, ...);
+      al tocco si apre l'app toccata **e** parte il mirroring (con il consenso già gestito).
+- [ ] Se il mirroring è **già attivo**, toccando un'altra icona si apre l'altra app
+      **mantenendo** lo streaming (niente riavvio).
+- [ ] Apertura app: `Intent` esplicito per package + `FLAG_ACTIVITY_NEW_TASK`
+      (siamo in un foreground service); elenco app con `queryIntentActivities`.
+
+**Prerequisito già fatto in 2.0.6**: la cattura è forzata a **schermo intero**
+(`MediaProjectionConfig.createConfigForDefaultDisplay()`): il dialog di Android 14+
+non offre più "app singola", che romperebbe il cambio app a mirroring attivo.
+
+---
+
 ## ✅ Chiusi / spiegati
 
 ### Notifica di mirroring persistente a app chiusa — **corretto in 2.0.3**
