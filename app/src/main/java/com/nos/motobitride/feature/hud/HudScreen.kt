@@ -14,6 +14,7 @@ import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
@@ -31,6 +32,7 @@ import androidx.compose.material3.ButtonDefaults
 import androidx.compose.material3.Card
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.HorizontalDivider
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
@@ -212,21 +214,19 @@ fun HudScreen(
 
     var startupApplied by remember { mutableStateOf(false) }
     if (!isPreview) {
-        LaunchedEffect(savedHud, autoConnect, autoCancelled) {
-            if (startupApplied || autoCancelled) return@LaunchedEffect
+        // Reagisce allo switch (sia all'avvio sia se l'utente lo cambia a runtime):
+        // con l'automatico attivo si stabilisce SOLO la connessione.
+        LaunchedEffect(autoConnect, savedHud) {
+            if (!autoConnect || autoCancelled) return@LaunchedEffect
             val hud = savedHud ?: return@LaunchedEffect
-            startupApplied = true
-
-            AppLog.i(
-                TAG_UI,
-                "Avvio: connessione automatica=${autoConnect}, HUD ${hud.displayName}"
-            )
-
-            // In automatico si stabilisce SOLO la connessione: il video si
-            // avvia dal pulsante "Avvia mirroring".
-            if (autoConnect) {
+            if (streamState == StreamState.IDLE || streamState == StreamState.ERROR) {
+                AppLog.i(TAG_UI, "Auto: connessione verso ${hud.displayName}")
                 HudSession.connect()
             }
+        }
+        // Se l'utente spegne l'automatico, l'annullamento locale non serve piu'.
+        LaunchedEffect(autoConnect) {
+            if (!autoConnect) autoCancelled = false
         }
     }
 
@@ -239,8 +239,22 @@ fun HudScreen(
             streamState == StreamState.WAITING_HUD
     val mirroring = streamState == StreamState.MIRRORING
     val noBike = savedHud == null
+    // Automatico attivo, nessun tentativo in corso: "in attesa del TFT".
+    val autoWaiting = !noBike && autoConnect && !autoCancelled && !connected && !working
+
+
     val linkConnected = wifiController?.isHudConnected ?: false
     val hudName = savedHud?.displayName ?: "-"
+
+    // Riga piccola in fondo al pulsante: le stesse informazioni della vecchia card.
+    val details = buildString {
+        append("Link ").append(if (linkConnected) "ON" else "OFF")
+        append(" · ").append(wifiController?.hudIp ?: "-")
+        append(" · ").append(streamState.name)
+        append(" · ").append(hudStreamController?.negotiatedWidth ?: 592)
+        append("x").append(hudStreamController?.negotiatedHeight ?: 752)
+        if (hudStreamController?.isLiveMirroring == true) append(" · MIRROR")
+    }
 
     Scaffold(
         topBar = {
@@ -301,31 +315,37 @@ fun HudScreen(
                 }
             }
 
-            Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
-                Button(
+            Button(
                     onClick = {
-                        if (savedHud == null) {
-                            // Nessuna moto: il pulsante rosso apre la scansione.
-                            onShowQrScanner
-                        } else ctx.getActivity()?.let { act ->
+                        when {
+                            // Nessuna moto: apre la scansione
+                            savedHud == null -> onShowQrScanner
+
+                            // In corso o in attesa: ANNULLA con feedback
+                            working || autoWaiting -> {
+                                AppLog.i(TAG_UI, "Annullo la connessione")
+                                autoCancelled = true
+                                HudSession.disconnect()
+                                Toast.makeText(
+                                    ctx,
+                                    AppTexts.get("hud_connect_cancelled", currentLang),
+                                    Toast.LENGTH_SHORT
+                                ).show()
+                            }
+
+                            // Connessa: nessuna azione (D1)
+                            connected -> Unit
+
+                            // Disconnessa: connette
+                            else -> ctx.getActivity()?.let { act ->
                             when {
                                 ContextCompat.checkSelfPermission(
                                     ctx,
                                     Manifest.permission.NEARBY_WIFI_DEVICES
                                 ) == PackageManager.PERMISSION_GRANTED -> {
-                                    AppLog.i(TAG_UI, "Connetti premuto")
-                                    if (savedHud == null) {
-                                        AppLog.w(TAG_UI, "Nessun HUD: scansiona il QR")
-                                        Toast.makeText(
-                                            ctx,
-                                            AppTexts.get("hud_no_saved", currentLang),
-                                            Toast.LENGTH_SHORT
-                                        ).show()
-                                    } else {
-                                        // Il pulsante CONNETTE e basta: il video
-                                        // parte con "Avvia mirroring".
-                                        HudSession.connect()
-                                    }
+                                    // Il pulsante CONNETTE e basta: il video
+                                    // parte con "Avvia mirroring".
+                                    HudSession.connect()
                                 }
 
                                 ActivityCompat.shouldShowRequestPermissionRationale(
@@ -348,8 +368,12 @@ fun HudScreen(
                                 }
                             }
                         }
+                        }
                     },
-                    modifier = Modifier.weight(1f),
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(124.dp),
+                    contentPadding = PaddingValues(horizontal = 16.dp, vertical = 12.dp),
                     colors = ButtonDefaults.buttonColors(
                         containerColor = when {
                             noBike -> Color(0xFFE53935)
@@ -358,41 +382,69 @@ fun HudScreen(
                         }
                     )
                 ) {
-                    if (noBike) {
-                        Icon(
-                            painter = painterResource(R.drawable.ic_qr),
-                            contentDescription = null,
-                            tint = Color.White
-                        )
-                        Spacer(Modifier.width(8.dp))
-                    } else if (working) {
-                        CircularProgressIndicator(
-                            modifier = Modifier.size(16.dp),
-                            color = Color.White,
-                            strokeWidth = 2.dp
-                        )
-                        Spacer(Modifier.width(8.dp))
-                    } else if (connected) {
-                        Icon(Icons.Default.Check, contentDescription = null, tint = Color.White)
-                        Spacer(Modifier.width(8.dp))
-                    }
-                    Column(horizontalAlignment = Alignment.Start) {
-                        Text(
-                            text = when {
-                                noBike -> AppTexts.get("hud_connect_register", currentLang)
-                                working -> AppTexts.get("hud_connect_connecting", currentLang)
-                                connected -> AppTexts.get("hud_connect_connected", currentLang)
-                                else -> AppTexts.get("hud_connect_tap", currentLang)
-                            },
-                            color = Color.White
-                        )
-                        if (working) {
-                            Text(
-                                text = AppTexts.get("hud_tap_to_cancel", currentLang),
-                                style = MaterialTheme.typography.labelSmall,
-                                color = Color.White.copy(alpha = 0.9f)
-                            )
+                    Column(
+                        modifier = Modifier.fillMaxWidth(),
+                        verticalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Row(verticalAlignment = Alignment.CenterVertically) {
+                            if (noBike) {
+                                Icon(
+                                    painter = painterResource(R.drawable.ic_qr),
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                            } else if (working) {
+                                CircularProgressIndicator(
+                                    modifier = Modifier.size(20.dp),
+                                    color = Color.White,
+                                    strokeWidth = 2.dp
+                                )
+                            } else if (connected) {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White
+                                )
+                            } else {
+                                Icon(
+                                    imageVector = Icons.Default.Check,
+                                    contentDescription = null,
+                                    tint = Color.White.copy(alpha = 0.35f)
+                                )
+                            }
+                            Spacer(Modifier.width(12.dp))
+                            Column(Modifier.weight(1f), horizontalAlignment = Alignment.Start) {
+                                Text(
+                                    text = if (noBike) {
+                                        AppTexts.get("hud_connect_register", currentLang)
+                                    } else {
+                                        "$hudName \u00b7 " + when {
+                                            working -> AppTexts.get("hud_connect_connecting", currentLang)
+                                            connected -> AppTexts.get("hud_connect_connected", currentLang)
+                                            else -> AppTexts.get("hud_connect_tap", currentLang)
+                                        }
+                                    },
+                                    style = MaterialTheme.typography.titleMedium,
+                                    color = Color.White
+                                )
+                                if (working) {
+                                    Text(
+                                        text = AppTexts.get("hud_tap_to_cancel", currentLang),
+                                        style = MaterialTheme.typography.labelSmall,
+                                        color = Color.White.copy(alpha = 0.9f)
+                                    )
+                                }
+                            }
                         }
+
+                        HorizontalDivider(color = Color.White.copy(alpha = 0.25f))
+
+                        // Progressioni: le stesse info della vecchia card, in piccolo.
+                        Text(
+                            text = details,
+                            style = MaterialTheme.typography.labelSmall,
+                            color = Color.White.copy(alpha = 0.85f)
+                        )
                     }
                 }
 
@@ -413,7 +465,6 @@ fun HudScreen(
                         else AppTexts.get("hud_mirroring_start", currentLang)
                     )
                 }
-            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(

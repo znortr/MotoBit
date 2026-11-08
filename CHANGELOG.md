@@ -4,6 +4,40 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.1.1 — Pulsante grande: annullamento, reazione allo switch, dettagli
+
+**Data**: 2026-11-07 · **versionCode**: 2101
+
+### Fix dei 3 difetti segnalati
+
+**1. Il tap durante la connessione non annullava.**
+L'`onClick` chiamava sempre `HudSession.connect()` (no-op se già in corso).
+Ora c'è una macchina a stati:
+
+| Stato | Azione al tocco |
+|---|---|
+| Nessuna moto | apre la scansione QR |
+| In connessione / in attesa | **annulla** (`HudSession.disconnect()`) + Toast *"Connessione annullata"* |
+| Connessa | nessuna azione (D1) |
+| Disconnessa | connette |
+
+**2. Lo switch "Connessione automatica" non cambiava il pulsante.**
+Il vecchio effetto di avvio scattava una volta sola (`startupApplied`). Ora un
+`LaunchedEffect(autoConnect, savedHud)` reagisce **anche a runtime**: accendendo
+lo switch l'app si connette subito, spegnendolo l'annullamento locale si azzera.
+Nuovo stato **`autoWaiting`**: con l'automatico attivo e nessun tentativo in corso
+il pulsante è giallo "In attesa del TFT…".
+
+**3. Pulsante troppo piccolo e senza feedback.**
+- **Full width**, altezza **124 dp**
+- icona a sinistra (QR rossa / spinner giallo / ✓ verde / ✓ attenuata)
+- **nome della moto nel testo**: «Voge 033990 · connessa»
+- sotto il titolo, quando lavora: *"tocca per annullare"*
+- divisore e **riga piccola in fondo con le progressioni** (le stesse della vecchia card):
+  `Link ON · 192.168.13.1 · MIRRORING · 592x752 · MIRROR`
+
+---
+
 ## 🚀 2.1.0 — Connessione separata dal mirroring + connessione automatica
 
 **Data**: 2026-11-07 · **versionCode**: 2100
