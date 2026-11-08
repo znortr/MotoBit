@@ -116,6 +116,7 @@ fun HudScreen(
 
     val savedHud by SavedHud.current.collectAsState()
     val autoConnect by AppSettings.autoConnect.collectAsState()
+    val showHomeDiagnostics by AppSettings.showHomeDiagnostics.collectAsState()
     /** Annullamento dell'attesa automatica, valido solo per questa sessione app. */
     var autoCancelled by remember { mutableStateOf(false) }
 
@@ -281,6 +282,8 @@ fun HudScreen(
             verticalArrangement = Arrangement.spacedBy(10.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            // Card diagnostica: nascosta di default (Opzioni sviluppo -> switch).
+            if (showHomeDiagnostics) {
             Card(modifier = Modifier.fillMaxWidth()) {
                 Column(
                     modifier = Modifier
@@ -320,6 +323,7 @@ fun HudScreen(
                         style = MaterialTheme.typography.bodySmall
                     )
                 }
+            }
             }
 
             Button(

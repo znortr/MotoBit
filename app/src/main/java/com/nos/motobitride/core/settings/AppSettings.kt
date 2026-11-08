@@ -28,6 +28,7 @@ object AppSettings {
     private const val FILE = "motobit_settings"
     private const val KEY_STARTUP = "startup_behavior"       // legacy (migrazione)
     private const val KEY_AUTO_CONNECT = "auto_connect"
+    private const val KEY_SHOW_HOME_DIAGNOSTICS = "show_home_diagnostics"
     // Chiave nuova: "attesa attiva" in MINUTI. Le vecchie chiavi
     // (encoder_idle_timeout_min / _sec) restano ignorate di proposito.
     private const val KEY_ACTIVE_WAIT_MIN = "active_wait_min"
@@ -97,6 +98,13 @@ object AppSettings {
     private val _autoConnect = MutableStateFlow(false)
     val autoConnect: StateFlow<Boolean> = _autoConnect.asStateFlow()
 
+    /**
+     * Mostra in Home la card diagnostica (HUD, stato, IP, evento link...).
+     * Default OFF: la Home resta pulita; si accende da Opzioni sviluppo.
+     */
+    private val _showHomeDiagnostics = MutableStateFlow(false)
+    val showHomeDiagnostics: StateFlow<Boolean> = _showHomeDiagnostics.asStateFlow()
+
     private val _language = MutableStateFlow(AppLanguage.ITALIANO)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
@@ -128,6 +136,7 @@ object AppSettings {
         _startup.value = StartupBehavior.fromStored(p.getString(KEY_STARTUP, null))
         // Migrazione dal vecchio comportamento a 3 voci:
         // AUTO_LINK / AUTO_LINK_AND_STREAM -> automatico, MANUAL -> manuale.
+        _showHomeDiagnostics.value = p.getBoolean(KEY_SHOW_HOME_DIAGNOSTICS, false)
         _autoConnect.value = if (p.contains(KEY_AUTO_CONNECT)) {
             p.getBoolean(KEY_AUTO_CONNECT, false)
         } else {
@@ -225,6 +234,12 @@ object AppSettings {
         _autoConnect.value = enabled
         prefs?.edit()?.putBoolean(KEY_AUTO_CONNECT, enabled)?.apply()
         AppLog.i(TAG, "Connessione automatica -> ${if (enabled) "ON" else "OFF"}")
+    }
+
+    fun setShowHomeDiagnostics(enabled: Boolean) {
+        _showHomeDiagnostics.value = enabled
+        prefs?.edit()?.putBoolean(KEY_SHOW_HOME_DIAGNOSTICS, enabled)?.apply()
+        AppLog.i(TAG, "Card diagnostica in Home -> ${if (enabled) "ON" else "OFF"}")
     }
 
     /** Numero di push (a 250ms) della raffica iniziale dell'ora al TFT. */

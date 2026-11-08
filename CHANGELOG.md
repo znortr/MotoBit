@@ -4,6 +4,30 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🎨 2.1.7 — Card diagnostica della Home nascosta dietro uno switch
+
+**Data**: 2026-11-07 · **versionCode**: 2107
+
+### Cosa cambia
+La card con HUD / stato / IP / evento link in cima alla Home **non è più sempre
+visibile**. Non è stata eliminata: si riattiva da
+**Impostazioni → Opzioni sviluppo → “Card diagnostica in Home”** (default **OFF**).
+
+Scelta della posizione: **Opzioni sviluppo** e non “Generali”, perché è
+contenuto diagnostico e chi non sviluppa non deve vederlo.
+
+### Dettagli
+- `AppSettings.showHomeDiagnostics` (persistito, default `false`)
+- `HudScreen`: la `Card` è dentro `if (showHomeDiagnostics)`
+- `SettingsDevelopmentScreen`: nuovo switch, subito sotto quello del log su file
+- Stringhe IT/EN `settings_home_diag_title` / `_desc`
+
+### Risultato
+Home pulita: pulsante di connessione, pulsante mirroring, Chiudi. Chi ha bisogno
+della diagnostica la riaccende in un tocco.
+
+---
+
 ## 🧹 2.1.6 — Splash rimossa: resta solo lo schermo nero
 
 **Data**: 2026-11-07 · **versionCode**: 2106

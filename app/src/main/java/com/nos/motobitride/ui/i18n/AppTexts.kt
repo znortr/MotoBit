@@ -71,6 +71,8 @@ object AppTexts {
         "hud_mirroring_start" to "Avvia mirroring",
         "hud_mirroring_stop" to "Ferma mirroring",
 
+        "settings_home_diag_title" to "Card diagnostica in Home",
+        "settings_home_diag_desc" to "Mostra in cima alla Home HUD, stato, IP ed evento del link. Default: nascosta.",
         "settings_auto_connect_title" to "Connessione automatica",
         "settings_auto_connect_desc" to "All'avvio l'app resta in attesa e si connette da sola appena trova il TFT. Se disattivata, la connessione parte dal pulsante in Home.",
         "settings_vibrate_title" to "Vibrazione su connessione",
@@ -234,6 +236,8 @@ object AppTexts {
         "hud_mirroring_start" to "Start mirroring",
         "hud_mirroring_stop" to "Stop mirroring",
 
+        "settings_home_diag_title" to "Diagnostics card on Home",
+        "settings_home_diag_desc" to "Shows HUD, status, IP and link event at the top of Home. Default: hidden.",
         "settings_auto_connect_title" to "Automatic connection",
         "settings_auto_connect_desc" to "On startup the app waits and connects by itself as soon as it finds the TFT. If disabled, connection starts from the button on Home.",
         "settings_vibrate_title" to "Vibrate on connection",

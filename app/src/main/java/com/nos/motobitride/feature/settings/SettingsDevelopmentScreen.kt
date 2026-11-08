@@ -41,6 +41,7 @@ fun SettingsDevelopmentScreen(
     val clockPushCount by AppSettings.clockPushCount.collectAsState()
     val diagLogEnabled by AppSettings.diagLogEnabled.collectAsState()
     val periodicKeepalive by AppSettings.periodicClockKeepalive.collectAsState()
+    val showHomeDiagnostics by AppSettings.showHomeDiagnostics.collectAsState()
 
     SettingsSubPage(
         title = AppTexts.get("settings_cat_development_title", currentLang),
@@ -114,6 +115,30 @@ fun SettingsDevelopmentScreen(
             Switch(
                 checked = diagLogEnabled,
                 onCheckedChange = { AppSettings.setDiagLogEnabled(it) }
+            )
+        }
+
+        // Card diagnostica in Home: nascosta di default, si accende da qui.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = AppTexts.get("settings_home_diag_title", currentLang),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = AppTexts.get("settings_home_diag_desc", currentLang),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = showHomeDiagnostics,
+                onCheckedChange = { AppSettings.setShowHomeDiagnostics(it) }
             )
         }
 
