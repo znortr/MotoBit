@@ -114,8 +114,21 @@ object SavedHud {
     }
 
     fun save(qr: QrContent.HudWifi) {
-        val data = SavedHudData.fromQr(qr)
+        var data = SavedHudData.fromQr(qr)
         val previous = _current.value
+
+        // Il MAC imparato dalla discovery deve SOPRAVVIVERE se il QR non lo
+        // contiene.
+        //
+        // `save()` viene richiamata con lo STESSO QR a ogni ritorno in Home
+        // (LaunchedEffect su hudQrValue) e anche ad ogni "Avvia": senza questo
+        // merge ogni chiamata riscriveva `mac = null`, cancellando il MAC
+        // appreso e costringendo a rifare la discovery (2-3 s) alla
+        // connessione successiva. Sintomo: MAC assente in "Info tecniche".
+        if (data.mac.isNullOrBlank() && previous != null && previous.ssid == data.ssid) {
+            data = data.copy(mac = previous.mac)
+            AppLog.i(TAG, "MAC preservato dal salvataggio precedente: ${data.mac}")
+        }
 
         if (previous != null && previous.ssid == data.ssid && previous.mac == data.mac) {
             AppLog.i(TAG, "HUD invariato: ${data.displayName}")

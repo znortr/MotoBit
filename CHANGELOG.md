@@ -4,6 +4,47 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.0.4 — Il MAC del TFT ora è davvero persistente
+
+**Data**: 2026-11-07 · **versionCode**: 2004
+
+### Sintomo
+In **Garage → Info tecniche** il campo **MAC** mostrava `—` (o spariva dopo
+qualche passaggio). Il MAC appreso dalla discovery Wi-Fi Direct va poi perso,
+costringendo a rifare la discovery (2-3 s) a ogni connessione.
+
+### Causa
+`SavedHud.save(qr)` fa `data = SavedHudData.fromQr(qr)`, cioè `mac = qr.mac`. Se il
+QR **non contiene** il MAC (succede), la scrittura azzerava il valore appreso in
+precedenza da `updateMac()`.
+
+E `save()` viene richiamata **molto spesso** con lo stesso QR:
+- `LaunchedEffect(hudQrValue)` in `HudScreen` — a ogni ritorno in Home;
+- nel ramo "Avvia" di `HudScreen`;
+- `LaunchedEffect(hudQrValue)` in `GarageScreen`.
+
+Quindi: connetti → `updateMac()` salva il MAC → torni in Home → `save()` lo
+riscrive `null`. Il MAC non sopravviveva mai.
+
+### Fix
+In `save()`: se il QR in arrivo **non** ha il MAC e l'SSID è lo stesso, si
+**conserva** quello già memorizzato:
+
+```kotlin
+if (data.mac.isNullOrBlank() && previous != null && previous.ssid == data.ssid) {
+    data = data.copy(mac = previous.mac)
+    AppLog.i(TAG, "MAC preservato dal salvataggio precedente: ${data.mac}")
+}
+```
+
+La prima volta il MAC viene imparato dalla discovery (`updateMac`), poi resta
+stabile in `SharedPreferences` e visibile in **Info tecniche**.
+
+### Invariato
+Connessione, trasmissione, stabilità, encoder, libreria Go.
+
+---
+
 ## 🐛 2.0.3 — Notifica persistente su "Chiudi" e "Dimentica" corretto
 
 **Data**: 2026-11-07 · **versionCode**: 2003
