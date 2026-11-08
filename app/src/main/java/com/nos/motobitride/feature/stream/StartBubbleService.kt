@@ -114,6 +114,16 @@ class StartBubbleService : Service() {
         return START_NOT_STICKY
     }
 
+    /**
+     * L'utente ha rimosso il task di MotoBit dal registro app: la bolla non ha
+     * piu' senso, va distrutta insieme al servizio.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        AppLog.i(TAG, "Task rimossa: chiudo la bolla")
+        stopSelf()
+        super.onTaskRemoved(rootIntent)
+    }
+
     override fun onDestroy() {
         watcher?.cancel()
         bubble?.let { view ->

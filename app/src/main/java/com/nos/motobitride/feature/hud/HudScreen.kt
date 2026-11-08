@@ -556,6 +556,7 @@ fun HudScreen(
                         // `closeAll()` non prova ad aggiornare una notifica che
                         // non esiste piu'.
                         ScreenCaptureService.stopService(ctx)
+                        StartBubbleService.hide(ctx)
                         HudSession.closeAll()
                         ctx.getActivity()?.finishAndRemoveTask()
                     }

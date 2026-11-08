@@ -4,6 +4,29 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.2.4 — La bolla AVVIA si distrugge chiudendo MotoBit
+
+**Data**: 2026-11-07 · **versionCode**: 2204
+
+### Sintomo
+Dopo aver aperto un'app, la bolla compariva regolarmente; ma **chiudendo MotoBit**
+(swipe dal registro app) la bolla **restava**.
+
+### Causa
+`StartBubbleService` non aveva `onTaskRemoved()`: un servizio in foreground
+sopravvive alla rimozione del task, e la sua bolla con lui.
+
+### Fix
+- `onTaskRemoved()` su `StartBubbleService` → `stopSelf()` (Android chiama
+  `onTaskRemoved` su **tutti** i servizi dell'app quando il task viene rimosso).
+- Il pulsante **Chiudi** in Home ora chiama anche `StartBubbleService.hide(ctx)`,
+  così bolla e notifica spariscono anche con la chiusura esplicita.
+
+### Invariato
+Connessione, streaming, protocollo, libreria Go.
+
+---
+
 ## ⚡ 2.2.3 — Avvio diretto: rimosso il dialogo "Avvia mirroring?"
 
 **Data**: 2026-11-07 · **versionCode**: 2203
