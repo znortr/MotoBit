@@ -33,6 +33,12 @@
         viene piu' ritrovato dopo uno spegnimento.
     -->
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_LOCATION"/>
+    <!--
+        Necessario al foreground service della bolla AVVIA (tipo specialUse).
+        Senza questo permesso startForeground() lancia SecurityException e il
+        servizio muore: la bolla non appare mai.
+    -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE"/>
     <uses-permission android:name="android.permission.WAKE_LOCK"/>
     <!-- Feedback aptico su connessione/perdita del link (opzionale) -->
     <uses-permission android:name="android.permission.VIBRATE"/>

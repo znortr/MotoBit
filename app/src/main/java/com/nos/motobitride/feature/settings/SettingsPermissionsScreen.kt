@@ -183,13 +183,21 @@ private fun PermissionsContent(
         ok = overlayGranted,
         actionLabel = if (overlayGranted) null else AppTexts.get("perm_grant", currentLang),
         onAction = {
-            runCatching {
-                ctx.startActivity(
-                    Intent(
-                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
-                        Uri.parse("package:${ctx.packageName}")
-                    )
-                )
+            // Pagina dell'app (Impostazioni -> App -> MotoBit): da qui si
+            // accede ai permessi speciali, che la pagina "standard" spesso non
+            // mostra in modo completo sulle ROM cinesi.
+            val appDetails = Intent(
+                Settings.ACTION_APPLICATION_DETAILS_SETTINGS,
+                Uri.parse("package:${ctx.packageName}")
+            )
+            val overlayPage = Intent(
+                Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                Uri.parse("package:${ctx.packageName}")
+            )
+            val opened = runCatching { ctx.startActivity(appDetails) }.isSuccess ||
+                    runCatching { ctx.startActivity(overlayPage) }.isSuccess
+            if (!opened) {
+                runCatching { ctx.startActivity(overlayPage) }
             }
         }
     )

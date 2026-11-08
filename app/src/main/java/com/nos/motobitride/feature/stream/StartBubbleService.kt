@@ -56,7 +56,9 @@ class StartBubbleService : Service() {
 
         /** Mostra la bolla per [packageName] (l'app da riaprire dopo l'avvio). */
         fun show(context: Context, packageName: String) {
-            if (!Settings.canDrawOverlays(context)) {
+            val canDraw = Settings.canDrawOverlays(context)
+            AppLog.i(TAG, "show(): canDrawOverlays=$canDraw pkg=$packageName")
+            if (!canDraw) {
                 AppLog.w(TAG, "Permesso overlay mancante: bolla non mostrata")
                 return
             }
@@ -98,7 +100,15 @@ class StartBubbleService : Service() {
         }
 
         targetPackage = intent?.getStringExtra(EXTRA_PACKAGE).orEmpty()
-        startForeground(NOTIFICATION_ID, buildNotification())
+        AppLog.i(TAG, "onStartCommand: avvio foreground + bolla (pkg=$targetPackage)")
+        try {
+            startForeground(NOTIFICATION_ID, buildNotification())
+        } catch (t: Throwable) {
+            // Tipico: manca FOREGROUND_SERVICE_SPECIAL_USE o il tipo nel manifest
+            AppLog.e(TAG, "startForeground FALLITO: la bolla non puo' apparire", t)
+            stopSelf()
+            return START_NOT_STICKY
+        }
         showBubble()
         watchStreamState()
         return START_NOT_STICKY
@@ -301,7 +311,7 @@ class StartBubbleService : Service() {
         )
 
         return NotificationCompat.Builder(this, CHANNEL_ID)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_link_off)
             .setContentTitle(getString(R.string.app_name))
             .setContentText("Tocca AVVIA sopra l'app per trasmettere al TFT")
             .setOngoing(true)

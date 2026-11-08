@@ -4,6 +4,32 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.2.2 — Bolla AVVIA non visibile: mancava un permesso
+
+**Data**: 2026-11-07 · **versionCode**: 2202
+
+### Bug 1 — la bolla non appariva (permesso overlay concesso)
+**Causa**: il servizio della bolla usa `foregroundServiceType="specialUse"`. Da
+Android 14 quel tipo richiede anche il permesso
+**`FOREGROUND_SERVICE_SPECIAL_USE`**, che non era dichiarato: `startForeground()`
+lanciava `SecurityException` → **crash del servizio** → nessuna bolla.
+
+**Fix**: aggiunto il permesso. In più:
+- `startForeground` protetto da try/catch con log esplicito;
+- log all'ingresso di `show()` (con esito di `canDrawOverlays`);
+- icona della notifica cambiata a un vettore bianco (`ic_link_off`): un'icona
+  adattiva come small icon non è affidabile.
+
+> Questo crash spiega probabilmente anche il punto 3 (l'app che \"torna in
+> background\" un paio di volte): il processo moriva e veniva ricreato.
+
+### Bug 2 — concessione dei permessi speciali
+La riga *Visualizza sopra altre app* ora apre **Impostazioni → App → MotoBit**
+(`ACTION_APPLICATION_DETAILS_SETTINGS`), da cui si accede ai permessi speciali;
+se non disponibile ripiega sulla pagina overlay dedicata.
+
+---
+
 ## 🚀 2.2.1 — Un tocco: consenso e connessione in parallelo + spinner nella bolla
 
 **Data**: 2026-11-07 · **versionCode**: 2201
