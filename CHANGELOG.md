@@ -4,6 +4,53 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 2.2.0 — Home launcher: griglia app + avvio mirroring dall'app
+
+**Data**: 2026-11-07 · **versionCode**: 2200
+
+### Home
+- **Griglia a 2 colonne** sotto il pulsante di connessione: ogni app è un
+  **riquadro quadrato con bordo** (icona originale + nome centrati).
+- Pulsante **AGGIUNGI APP** in fondo alla griglia.
+
+### Selettore app
+- Dialog a griglia **3×3** (9 per pagina), **swipe orizzontale** e **indicatore**
+  di pagina; selezione multipla con tap; chiusura con "Fatto".
+- Filtro: esclude se stessa e una breve deny-list di app di sistema inutili.
+- `queryIntentActivities` richiede le **`<queries>`** nel manifest (Android 11+).
+- Selezione **persistita** in `SharedPreferences` (JSON, ordine mantenuto) e
+  potata all'avvio dalle app non più installate.
+
+### Avvio app + mirroring
+| Scenario | Comportamento |
+|---|---|
+| **TFT connesso** | tap → `StreamLaunchActivity` → conferma → consenso MP → `startStream()` → apre l'app |
+| **TFT non connesso** | tap → apre subito l'app + **bolla flottante AVVIA** (trascinabile) → al tocco: connessione → conferma → consenso → streaming → la bolla sparisce |
+
+### Nuovi file
+- `core/apps/SavedApps.kt` — lista app persistita
+- `core/apps/InstalledApps.kt` — elenco/avvio app, icone originali
+- `feature/home/AppGrid.kt` — griglia 2 colonne
+- `feature/home/AppPickerDialog.kt` — selettore 3×3 paginato
+- `feature/stream/StreamLaunchActivity.kt` — Activity **trasparente** che orchestra
+  connessione → conferma → consenso MediaProjection → streaming → apertura app
+- `feature/stream/StartBubbleService.kt` — FGS `specialUse` con bolla **dragabile**
+  che si rimuove da sola al `MIRRORING`
+
+### Manifest
+`<queries>` per MAIN/LAUNCHER · permesso `SYSTEM_ALERT_WINDOW` · Activity
+`StreamLaunchActivity` (tema translucido, esclusa da recenti) · servizio bolla.
+
+### Permessi
+Nuova riga in **Impostazioni → Permessi**: *Visualizza sopra altre app*, con
+stato reale e apertura della pagina di sistema.
+
+### Invariato
+`WifiApController`, `HudStreamController`, `HudSession`, `SavedHud`,
+`ScreenCaptureService`, encoder, protocollo EasyConn/PXC, libreria Go.
+
+---
+
 ## 🎨 2.1.7 — Card diagnostica della Home nascosta dietro uno switch
 
 **Data**: 2026-11-07 · **versionCode**: 2107

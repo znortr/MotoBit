@@ -60,8 +60,15 @@ import androidx.core.content.ContextCompat
 import com.nos.motobitride.core.hud.HudSession
 import com.nos.motobitride.core.hud.ScreenCaptureService
 import com.nos.motobitride.core.hud.StreamState
+import com.nos.motobitride.core.apps.AppInfo
+import com.nos.motobitride.core.apps.InstalledApps
+import com.nos.motobitride.core.apps.SavedApps
 import com.nos.motobitride.core.garage.VehicleStore
 import com.nos.motobitride.core.garage.vehicleDisplayName
+import com.nos.motobitride.feature.home.AppGrid
+import com.nos.motobitride.feature.home.AppPickerDialog
+import com.nos.motobitride.feature.stream.StartBubbleService
+import com.nos.motobitride.feature.stream.StreamLaunchActivity
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.qr.QrContent
@@ -262,6 +269,36 @@ fun HudScreen(
         append(" · ").append(hudStreamController?.negotiatedWidth ?: 592)
         append("x").append(hudStreamController?.negotiatedHeight ?: 752)
         if (hudStreamController?.isLiveMirroring == true) append(" · MIRROR")
+    }
+
+    // ---------------- App in Home ----------------
+    val appPackages by SavedApps.packages.collectAsState()
+    val allApps = remember(isPreview) {
+        if (isPreview) emptyList() else InstalledApps.load(ctx)
+    }
+    LaunchedEffect(allApps) {
+        SavedApps.pruneMissing(InstalledApps.installedPackages(allApps))
+    }
+    val selectedApps = remember(appPackages, allApps) {
+        appPackages.mapNotNull { pkg -> allApps.firstOrNull { it.packageName == pkg } }
+    }
+    var showAppPicker by remember { mutableStateOf(false) }
+
+    fun onAppTap(app: AppInfo) {
+        if (connected || linkConnected) {
+            // Scenario 1: TFT connesso -> conferma + consenso + streaming + apertura
+            AppLog.i(TAG_UI, "App scelta (TFT connesso): ${app.packageName}")
+            runCatching {
+                ctx.startActivity(
+                    StreamLaunchActivity.intent(ctx, app.packageName, openApp = true)
+                )
+            }.onFailure { AppLog.e(TAG_UI, "Avvio flusso streaming fallito", it) }
+        } else {
+            // Scenario 2: apro subito l'app e mostro la bolla AVVIA
+            AppLog.i(TAG_UI, "App scelta (TFT non connesso): ${app.packageName}")
+            StartBubbleService.show(ctx, app.packageName)
+            InstalledApps.launch(ctx, app.packageName)
+        }
     }
 
     Scaffold(
@@ -491,6 +528,24 @@ fun HudScreen(
                         else AppTexts.get("hud_mirroring_start", currentLang)
                     )
                 }
+
+            // ---------------- Griglia app (2 colonne) ----------------
+            AppGrid(
+                apps = selectedApps,
+                onAppClick = { app -> onAppTap(app) },
+                onAddApp = { showAppPicker = true },
+                emptyText = "Nessuna app in Home: aggiungine una con AGGIUNGI APP",
+                addLabel = "AGGIUNGI APP"
+            )
+
+            if (showAppPicker) {
+                AppPickerDialog(
+                    allApps = allApps,
+                    selectedPackages = appPackages.toSet(),
+                    onToggle = { SavedApps.toggle(it) },
+                    onDismiss = { showAppPicker = false }
+                )
+            }
 
             Row(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                 OutlinedButton(

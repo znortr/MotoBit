@@ -1,5 +1,8 @@
 package com.nos.motobitride.feature.settings
 
+import android.content.Intent
+import android.net.Uri
+import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.layout.Column
@@ -83,6 +86,8 @@ private fun PermissionsContent(
     var notifGranted by remember {
         mutableStateOf(PermissionsHelper.hasNotificationPermission(ctx))
     }
+    // Permesso "Visualizza sopra altre app": serve al pulsante flottante AVVIA.
+    var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(ctx)) }
 
     val runtimeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -104,11 +109,12 @@ private fun PermissionsContent(
             locationGranted = PermissionsHelper.hasLocationPermission(ctx)
             gpsEnabled = PermissionsHelper.isLocationEnabled(ctx)
             notifGranted = PermissionsHelper.hasNotificationPermission(ctx)
+            overlayGranted = Settings.canDrawOverlays(ctx)
             delay(1_500)
         }
     }
 
-    val allOk = locationGranted && gpsEnabled && notifGranted && batteryExempt
+    val allOk = locationGranted && gpsEnabled && notifGranted && batteryExempt && overlayGranted
 
     Text(
         text = AppTexts.get("perm_section_desc", currentLang),
@@ -166,6 +172,26 @@ private fun PermissionsContent(
         ok = batteryExempt,
         actionLabel = if (batteryExempt) null else AppTexts.get("perm_disable", currentLang),
         onAction = onRequestBattery
+    )
+
+    HorizontalDivider()
+
+    // Permesso di sistema (non un dialog): il tocco apre la pagina dedicata.
+    PermissionRow(
+        title = AppTexts.get("perm_overlay_title", currentLang),
+        desc = AppTexts.get("perm_overlay_desc", currentLang),
+        ok = overlayGranted,
+        actionLabel = if (overlayGranted) null else AppTexts.get("perm_grant", currentLang),
+        onAction = {
+            runCatching {
+                ctx.startActivity(
+                    Intent(
+                        Settings.ACTION_MANAGE_OVERLAY_PERMISSION,
+                        Uri.parse("package:${ctx.packageName}")
+                    )
+                )
+            }
+        }
     )
 }
 

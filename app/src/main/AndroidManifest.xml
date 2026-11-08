@@ -40,6 +40,19 @@
     <!-- Usato solo dal dialog di sistema per escludere l'app dal Doze -->
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS"/>
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS"/>
+    <!-- Pulsante flottante "AVVIA" sopra l'app dell'utente -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
+
+    <!--
+        Visibilita' delle app installate (Android 11+): senza queste queries
+        queryIntentActivities restituirebbe solo pochissime app.
+    -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -50,6 +63,27 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/Theme.MotobitRide">
+
+        <!-- Dialoghi trasparenti di avvio mirroring (conferma + consenso) -->
+        <activity
+            android:name=".feature.stream.StreamLaunchActivity"
+            android:excludeFromRecents="true"
+            android:exported="false"
+            android:noHistory="true"
+            android:taskAffinity=".stream"
+            android:theme="@style/Theme.MotobitRide.Translucent" />
+
+        <!-- Pulsante flottante "AVVIA" quando il TFT non e' connesso -->
+        <service
+            android:name=".feature.stream.StartBubbleService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="overlay_bubble" />
+        </service>
+
         <service
             android:name="com.nos.motobitride.core.hud.ScreenCaptureService"
             android:enabled="true"

@@ -7,6 +7,7 @@ import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Surface
 import androidx.compose.runtime.Composable
 import androidx.navigation.compose.rememberNavController
+import com.nos.motobitride.core.apps.SavedApps
 import com.nos.motobitride.core.garage.DeadlineWorker
 import com.nos.motobitride.core.garage.VehicleStore
 import com.nos.motobitride.core.link.SavedHud
@@ -23,6 +24,7 @@ class MainActivity : ComponentActivity() {
         AppSettings.init(applicationContext)
         SavedHud.init(applicationContext)
         VehicleStore.init(applicationContext)
+        SavedApps.init(applicationContext)
 
         // Controllo giornaliero delle scadenze (revisione/tassa/assicurazione).
         // Idempotente: WorkManager non duplica il lavoro gia' pianificato.

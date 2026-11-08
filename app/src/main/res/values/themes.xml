@@ -10,4 +10,15 @@
         <item name="android:windowBackground">@color/splash_background</item>
     </style>
 
+    <!--
+        Activity trasparente usata solo per mostrare i dialoghi di avvio
+        (conferma + consenso MediaProjection) sopra l'app dell'utente.
+    -->
+    <style name="Theme.MotobitRide.Translucent" parent="android:Theme.Translucent.NoTitleBar">
+        <item name="android:windowBackground">@android:color/transparent</item>
+        <item name="android:windowIsTranslucent">true</item>
+        <item name="android:windowNoTitle">true</item>
+        <item name="android:backgroundDimEnabled">true</item>
+    </style>
+
 </resources>
