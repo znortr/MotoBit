@@ -4,6 +4,44 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.8 — Lo streaming partiva PRIMA della negoziazione → proiezione revocata
+
+**Data**: 2026-11-07 · **versionCode**: 2308
+
+### Sintomo (dal log 11:21)
+La connessione funziona, ma **lo streaming non parte**:
+```
+11:21:17.529  MIRRORING ATTIVO 800x384          ← risoluzione di DEFAULT
+11:21:18.672  MediaCtrl/Init → 592x752 → "riallineo encoder"
+11:21:18.845  E createVirtualDisplay fallita (tentativo 2) -> SecurityException:
+              "Don't take multiple captures by invoking
+               MediaProjection#createVirtualDisplay multiple times on the same instance"
+11:21:18.846  MediaProjection revocata
+```
+
+### Causa (Android 14+)
+`MediaProjection#createVirtualDisplay` si può chiamare **una sola volta** per
+istanza. Il flusso `armPendingLaunch` avviava lo streaming appena `connected &&
+projection != null`, cioè **prima** che l'HU negoziasse la risoluzione (arriva
+1-2 s dopo l'handshake). Il mirroring partiva con 800x384, poi il riallineamento
+ricreava il VirtualDisplay sulla **stessa** proiezione → `SecurityException` →
+proiezione revocata → niente video.
+
+### Fix
+1. `HudStreamController.resolutionNegotiated` (impostato dal `MediaCtrl/Init`,
+   azzerato a ogni `beginDiscovery`).
+2. `HudSession.armPendingLaunch`: attende `connected && projection &&
+   resolutionNegotiated`; **fallback 3 s** se l'evento non arriva.
+   Così il VirtualDisplay si crea **una sola volta, con la risoluzione giusta**
+   (592x752) e non serve più riallineare.
+
+### Limite noto (non toccato)
+Un cambio di risoluzione **a streaming attivo** non è ricreabile su Android 14+
+senza un nuovo consenso. Con questo fix non dovrebbe più capitare (la
+negoziazione precede sempre l'aggancio).
+
+---
+
 ## 🐛 2.3.7 — Il TFT acceso DOPO non veniva più visto (tentativo appeso)
 
 **Data**: 2026-11-07 · **versionCode**: 2307

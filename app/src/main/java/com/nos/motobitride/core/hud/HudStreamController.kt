@@ -268,6 +268,21 @@ class HudStreamController(
     val negotiatedWidth: Int get() = videoWidth
     val negotiatedHeight: Int get() = videoHeight
 
+    /**
+     * Vero quando l'HU ha negoziato la risoluzione (evento MediaCtrl/Init).
+     *
+     * Serve perché su **Android 14+** `MediaProjection#createVirtualDisplay` si
+     * può chiamare **una sola volta** per istanza: se il mirroring venisse
+     * agganciato con la risoluzione di default e poi l'HU negoziasse la sua,
+     * il riallineamento proverebbe a ricreare il VirtualDisplay sulla stessa
+     * proiezione → `SecurityException` → **proiezione revocata, streaming perso**
+     * (visto nel log delle 11:21:18).
+     */
+    @Volatile
+    private var resolutionNegotiated = false
+
+    val isResolutionNegotiated: Boolean get() = resolutionNegotiated
+
     // ------------------------------------------------------------------
     // mDNS discovery
     // ------------------------------------------------------------------
@@ -736,6 +751,8 @@ class HudStreamController(
             return
         }
         _state.value = StreamState.DISCOVERING
+        // Nuova sessione: la risoluzione non e' ancora stata negoziata.
+        resolutionNegotiated = false
 
         // Se il livello link conosce gia' l'IP dell'HU, saltiamo mDNS.
         val knownIp = preferredHostIp
@@ -1549,7 +1566,8 @@ class HudStreamController(
             val size = parseNegotiatedSize(payload)
             if (size != null) {
                 val (w, h) = size
-                if (w != videoWidth || h != videoHeight) {
+                resolutionNegotiated = true
+            if (w != videoWidth || h != videoHeight) {
                     videoWidth = w
                     videoHeight = h
                     AppLog.i(TAG, "Nuova risoluzione negoziata ${w}x${h}: riallineo encoder")

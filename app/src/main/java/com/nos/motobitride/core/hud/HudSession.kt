@@ -342,6 +342,7 @@ object HudSession {
         if (pendingLaunchJob != null) return
 
         pendingLaunchJob = scope?.launch {
+            var connectedAtMs = 0L
             while (isActive) {
                 val state = stream?.state?.value
                 val connected = state == StreamState.CONNECTED ||
@@ -349,7 +350,19 @@ object HudSession {
                         state == StreamState.AWAITING_PROJECTION
                 val projectionReady = ScreenCaptureService.mediaProjectionFlow.value != null
 
-                if (connected && projectionReady) {
+                if (connected && connectedAtMs == 0L) connectedAtMs = System.currentTimeMillis()
+
+                // Si aspetta la risoluzione negoziata dall'HU (arriva ~1-2 s dopo
+                // l'handshake). Su Android 14+ il VirtualDisplay si crea UNA sola
+                // volta: agganciarlo con la risoluzione di default e poi
+                // riallinearlo fa revocare la proiezione (SecurityException).
+                // Fallback: dopo 3 s si parte comunque.
+                val negotiated = stream?.isResolutionNegotiated == true
+                val graceExpired = connectedAtMs != 0L &&
+                        (System.currentTimeMillis() - connectedAtMs) > 3_000L
+                val resolutionReady = negotiated || graceExpired
+
+                if (connected && projectionReady && resolutionReady) {
                     AppLog.i(TAG, "pendingLaunch: avvio streaming")
                     // startStream() imposta wantsStream: ferma anche la scadenza
                     // del pre-riscaldamento.
