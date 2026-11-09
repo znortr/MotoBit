@@ -4,6 +4,23 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🔍 2.3.11 — Diagnostica: chi chiama `connect()`
+
+**Data**: 2026-11-07 · **versionCode**: 2311
+
+Nel log 2.3.8 `connect()` veniva invocato ogni 0.6-3.4 s **senza nessuna riga del
+chiamante**: impossibile stabilire se fosse l'effetto della Home, il coalescing del
+link o altro. Aggiunta una riga temporanea con lo stack:
+
+```
+I/HudSession: connect() chiamato da: HudScreen.onAppTap:262 < ... 
+```
+
+Da rimuovere quando il chiamante sarà identificato (2.3.10 ha comunque già
+neutralizzato il sintomo: il timer non viene più prolungato).
+
+---
+
 ## 🐛 2.3.10 — L'attesa attiva non si prolungava all'infinito
 
 **Data**: 2026-11-07 · **versionCode**: 2310
