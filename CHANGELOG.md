@@ -4,6 +4,48 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## ⚡ 2.3.1 — Pre-riscaldamento del solo link (opzione C)
+
+**Data**: 2026-11-07 · **versionCode**: 2301
+
+### Il cambio di modello
+L'app **non deve sapere se il TFT è acceso**: deve solo sapere se è **connessa**.
+La ricerca è sempre compito suo, con il motore di connessione che già funziona.
+
+### Cosa succede ora
+```
+tap sull'app
+   ├─ connesso      → flusso completo (come prima)
+   └─ NON connesso   → apre l'app + bolla AVVIA + PRE-RISCALDA SOLO IL LINK P2P
+                       (nessuna sessione HU, nessun video)
+
+tap AVVIA → consenso → completa la sessione HU → streaming (2-4 s) → riapre l'app
+```
+
+**Perché solo il link**: dei 5-15 s di attesa, il grosso è la negoziazione P2P;
+la sessione Go dura ~1 s. Pre-riscaldando il link, AVVIA completa in **2-4 s** e
+soprattutto **l'HU non resta mai con una sessione senza frame** (rischio che non
+abbiamo mai verificato e che l'opzione “connetti tutto subito” avrebbe reso il
+caso normale).
+
+### Scadenza (Q5 = B)
+Dopo **`attesa attiva` minuti** senza streaming il pre-riscaldamento si chiude:
+- link formato → `disconnect()` (libera il Wi-Fi Direct)
+- link non formato → **ascolto passivo** (nessun tentativo, ma si riconnette da
+  solo quando il TFT riappare)
+La scadenza **non scatta** se lo streaming è attivo, se l'utente ha già premuto
+AVVIA o se c'è un consenso in attesa.
+
+### Dettagli tecnici
+- `HudSession.preWarmLink()` / `cancelPreWarm()`
+- `wantsConnection` resta **false** durante il pre-riscaldamento: altrimenti
+  `onLinkRestored()` aprirebbe subito la sessione HU lasciandola inattiva
+- `armPendingLaunch` ora chiama `startStream()` (imposta `wantsStream`, che a sua
+  volta ferma la scadenza del pre-riscaldamento)
+- Nessuna modifica a impostazioni, protocollo, `WifiApController` o libreria Go
+
+---
+
 ## 🚀 2.3.0 — Doppio consenso eliminato + flusso indistruttibile
 
 **Data**: 2026-11-07 · **versionCode**: 2300

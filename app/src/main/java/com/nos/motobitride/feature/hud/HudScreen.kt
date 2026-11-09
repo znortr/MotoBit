@@ -307,8 +307,12 @@ fun HudScreen(
                 )
             }.onFailure { AppLog.e(TAG_UI, "Avvio flusso streaming fallito", it) }
         } else {
-            // Scenario 2: apro subito l'app e mostro la bolla AVVIA
+            // Scenario 2 — opzione C: si apre subito l'app e si PRE-RISCALDA solo
+            // il link Wi-Fi Direct (nessuna sessione HU, nessun video). Cosi'
+            // l'AVVIA della bolla completa in 2-4 s invece di 5-15 s, e l'HU non
+            // resta mai con una sessione senza frame.
             AppLog.i(TAG_UI, "App scelta (TFT non connesso): ${app.packageName}")
+            HudSession.preWarmLink()
             StartBubbleService.show(ctx, app.packageName)
             InstalledApps.launch(ctx, app.packageName)
         }
