@@ -4,6 +4,40 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🧩 2.5.0 — Fase 1: fondamenta Shizuku (nessun cambio al video)
+
+**Data**: 2026-11-07 · **versionCode**: 2500
+
+Prima fase del progetto risoluzione/oscuramento: **solo fondamenta**, zero
+modifiche a connessione, streaming, encoder o protocollo.
+
+### Modulo isolato `:shizuku`
+| | |
+|---|---|
+| Contenuto | `ShizukuGatewayImpl` + `ShizukuProvider` (manifest **del modulo**) |
+| Dipendenze | `dev.rikka.shizuku:api:13.1.5` + `:provider` |
+| Isolamento | il modulo **non** dipende da `:app` → nessun ciclo |
+| Come lo raggiunge l'app | **riflessione** (`Class.forName`) → se il modulo non c'è, si usa `NoOpShizukuGateway` |
+| Per **escluderlo dall'APK** | commentare 2 righe (`include(":shizuku")` e `implementation(project(":shizuku"))`) → l'app compila e funziona, la pagina mostra "Shizuku non installato" |
+
+### Interfaccia
+- `ShizukuGateway` (core) + `ShizukuStatus`: `NOT_INSTALLED` · `NOT_RUNNING` · `NOT_AUTHORIZED` · `READY` · `DISABLED`
+- `ShizukuBridge`: init unica in `MainActivity`, accesso globale
+
+### UI
+- **Permessi** → nuova riga **Shizuku**: stato reale + azione contestuale (Installa / Avvia Shizuku / Autorizza)
+- **Risoluzione** (placeholder riempito) → interruttore **"Usa Shizuku"** (default **ON**) + stato + azione + nota "prossima fase"
+- **Home** → avviso cliccabile *"Shizuku non attivo: tocca per attivarlo"* (solo se l'interruttore è ON e Shizuku non è pronto)
+
+### Interruttore di esclusione
+`AppSettings.shizukuEnabled` (default **true**): se OFF l'app **non interroga mai** il ponte.
+
+### Verificato
+- Build verde, provider presente nel manifest finale (`rikka.shizuku.ShizukuProvider`, authorities `com.nos.motobitride.shizuku`, permesso `moe.shizuku.manager.permission.API_V23`)
+- APK 90,55 MB (+0,10 MB)
+
+---
+
 ## ⚡ 2.4.2 — Solo le app scelte sulla Home, elenco completo nel selettore
 
 **Data**: 2026-11-07 · **versionCode**: 2402

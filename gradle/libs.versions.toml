@@ -1,5 +1,7 @@
 [versions]
 agp = "8.12.3"
+coroutines = "1.9.0"
+shizuku = "13.1.5"
 barcodeScanning = "17.3.0"
 cameraCore = "1.5.2"
 kotlin = "2.0.21"
@@ -14,6 +16,10 @@ material3 = "1.4.0"
 navVersion = "2.9.6"
 
 [libraries]
+# Shizuku: modulo :shizuku (disattivabile togliendo la dipendenza in app/build.gradle.kts)
+shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
+shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
+kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraCore" }
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraCore" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraCore" }
@@ -38,6 +44,7 @@ material3 = { group = "androidx.compose.material3", name = "material3", version.
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
+android-library = { id = "com.android.library", version.ref = "agp" }
 kotlin-android = { id = "org.jetbrains.kotlin.android", version.ref = "kotlin" }
 kotlin-compose = { id = "org.jetbrains.kotlin.plugin.compose", version.ref = "kotlin" }
 

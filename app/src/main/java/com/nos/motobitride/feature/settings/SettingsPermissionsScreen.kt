@@ -30,6 +30,10 @@ import com.nos.motobitride.core.settings.BatteryOptimization
 import com.nos.motobitride.core.settings.PermissionsHelper
 import com.nos.motobitride.ui.i18n.AppLanguage
 import com.nos.motobitride.ui.i18n.AppTexts
+import com.nos.motobitride.ui.shizuku.actionKey
+import com.nos.motobitride.ui.shizuku.labelKey
+import com.nos.motobitride.ui.shizuku.performAction
+import com.nos.motobitride.ui.shizuku.rememberShizukuStatus
 import kotlinx.coroutines.delay
 
 /**
@@ -88,6 +92,10 @@ private fun PermissionsContent(
     }
     // Permesso "Visualizza sopra altre app": serve al pulsante flottante AVVIA.
     var overlayGranted by remember { mutableStateOf(Settings.canDrawOverlays(ctx)) }
+
+    // Shizuku (opzionale): stato osservato solo se l'interruttore generale è ON.
+    val shizukuEnabled by AppSettings.shizukuEnabled.collectAsState()
+    val shizukuStatus = rememberShizukuStatus(shizukuEnabled)
 
     val runtimeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -200,6 +208,17 @@ private fun PermissionsContent(
                 runCatching { ctx.startActivity(overlayPage) }
             }
         }
+    )
+
+    HorizontalDivider()
+
+    // Shizuku: opzionale. Serve alla sola pagina Risoluzione (fase 2).
+    PermissionRow(
+        title = AppTexts.get("shizuku_section_title", currentLang),
+        desc = AppTexts.get(shizukuStatus.labelKey(), currentLang),
+        ok = shizukuStatus.isReady,
+        actionLabel = shizukuStatus.actionKey()?.let { AppTexts.get(it, currentLang) },
+        onAction = { shizukuStatus.performAction() }
     )
 }
 

@@ -47,6 +47,11 @@ dependencies {
     // Custom HUD Lib
     implementation(files("libs/hudlib.aar"))
 
+    // Shizuku (modulo isolato). Per escluderlo: commentare questa riga
+    // e `include(":shizuku")` in settings.gradle.kts.
+    // L'app compila lo stesso: usa il gateway vuoto.
+    implementation(project(":shizuku"))
+
     // Camera X
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)

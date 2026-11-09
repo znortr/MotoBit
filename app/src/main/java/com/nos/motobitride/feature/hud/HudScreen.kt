@@ -80,6 +80,8 @@ import com.nos.motobitride.feature.ap.WifiApController
 import com.nos.motobitride.ui.components.MotobitTopAppBar
 import com.nos.motobitride.ui.i18n.AppLanguage
 import com.nos.motobitride.ui.i18n.AppTexts
+import com.nos.motobitride.ui.shizuku.performAction
+import com.nos.motobitride.ui.shizuku.rememberShizukuStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.withContext
@@ -130,6 +132,9 @@ fun HudScreen(
     // dell'auto delle impostazioni, solo in memoria.
     val sessionAuto by HudSession.autoConnectForSession.collectAsState()
     val showHomeDiagnostics by AppSettings.showHomeDiagnostics.collectAsState()
+    // Avviso Shizuku in Home (solo se l'interruttore generale e' attivo).
+    val shizukuEnabled by AppSettings.shizukuEnabled.collectAsState()
+    val shizukuStatus = rememberShizukuStatus(shizukuEnabled)
     /** Annullamento dell'attesa automatica, valido solo per questa sessione app. */
     var autoCancelled by remember { mutableStateOf(false) }
 
@@ -535,6 +540,17 @@ fun HudScreen(
                         else AppTexts.get("hud_mirroring_start", currentLang)
                     )
                 }
+
+            // Avviso Shizuku: compare solo se l'interruttore e' ON e Shizuku non e'
+            // pronto. Tocco = azione contestuale (installa / avvia / autorizza).
+            if (shizukuEnabled && !shizukuStatus.isReady) {
+                OutlinedButton(
+                    onClick = { shizukuStatus.performAction() },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text(AppTexts.get("shizuku_home_hint", currentLang))
+                }
+            }
 
             // ---------------- Griglia app (2 colonne) ----------------
             AppGrid(

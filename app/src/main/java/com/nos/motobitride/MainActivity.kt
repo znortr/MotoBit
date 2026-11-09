@@ -13,6 +13,7 @@ import com.nos.motobitride.core.garage.VehicleStore
 import com.nos.motobitride.core.link.SavedHud
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
+import com.nos.motobitride.core.shizuku.ShizukuBridge
 import com.nos.motobitride.navigation.AppNavGraph
 import com.nos.motobitride.ui.theme.MotobitRideTheme
 import kotlinx.coroutines.CoroutineScope
@@ -28,6 +29,7 @@ class MainActivity : ComponentActivity() {
         SavedHud.init(applicationContext)
         VehicleStore.init(applicationContext)
         SavedApps.init(applicationContext)
+        ShizukuBridge.init(applicationContext)
 
         // Controllo giornaliero delle scadenze (revisione/tassa/assicurazione).
         // Idempotente: WorkManager non duplica il lavoro gia' pianificato.

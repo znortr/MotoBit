@@ -29,6 +29,7 @@ object AppSettings {
     private const val KEY_STARTUP = "startup_behavior"       // legacy (migrazione)
     private const val KEY_AUTO_CONNECT = "auto_connect"
     private const val KEY_SHOW_HOME_DIAGNOSTICS = "show_home_diagnostics"
+    private const val KEY_SHIZUKU_ENABLED = "shizuku_enabled"
     // Chiave nuova: "attesa attiva" in MINUTI. Le vecchie chiavi
     // (encoder_idle_timeout_min / _sec) restano ignorate di proposito.
     private const val KEY_ACTIVE_WAIT_MIN = "active_wait_min"
@@ -105,6 +106,16 @@ object AppSettings {
     private val _showHomeDiagnostics = MutableStateFlow(false)
     val showHomeDiagnostics: StateFlow<Boolean> = _showHomeDiagnostics.asStateFlow()
 
+    /**
+     * Interruttore generale di Shizuku (pagina Risoluzione).
+     *
+     * Default ON. Se OFF l'app **non interroga mai** il ponte Shizuku: la pagina
+     * risoluzione mostra "disattivato" e tutte le azioni che ne dipendono sono
+     * disabilitate. È il modo per escluderlo senza ricompilare.
+     */
+    private val _shizukuEnabled = MutableStateFlow(true)
+    val shizukuEnabled: StateFlow<Boolean> = _shizukuEnabled.asStateFlow()
+
     private val _language = MutableStateFlow(AppLanguage.ITALIANO)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
@@ -137,6 +148,7 @@ object AppSettings {
         // Migrazione dal vecchio comportamento a 3 voci:
         // AUTO_LINK / AUTO_LINK_AND_STREAM -> automatico, MANUAL -> manuale.
         _showHomeDiagnostics.value = p.getBoolean(KEY_SHOW_HOME_DIAGNOSTICS, false)
+        _shizukuEnabled.value = p.getBoolean(KEY_SHIZUKU_ENABLED, true)
         _autoConnect.value = if (p.contains(KEY_AUTO_CONNECT)) {
             p.getBoolean(KEY_AUTO_CONNECT, false)
         } else {
@@ -240,6 +252,12 @@ object AppSettings {
         _showHomeDiagnostics.value = enabled
         prefs?.edit()?.putBoolean(KEY_SHOW_HOME_DIAGNOSTICS, enabled)?.apply()
         AppLog.i(TAG, "Card diagnostica in Home -> ${if (enabled) "ON" else "OFF"}")
+    }
+
+    fun setShizukuEnabled(enabled: Boolean) {
+        _shizukuEnabled.value = enabled
+        prefs?.edit()?.putBoolean(KEY_SHIZUKU_ENABLED, enabled)?.apply()
+        AppLog.i(TAG, "Shizuku -> ${if (enabled) "ON" else "OFF"}")
     }
 
     /** Numero di push (a 250ms) della raffica iniziale dell'ora al TFT. */

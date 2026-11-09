@@ -21,3 +21,7 @@ dependencyResolutionManagement {
 
 rootProject.name = "motobit-ride"
 include(":app")
+
+// Modulo Shizuku: disattivabile commentando questa riga + la dipendenza in app/build.gradle.kts.
+// Se il modulo non c'e', l'app usa il gateway "vuoto" (nessun errore di compilazione).
+include(":shizuku")
