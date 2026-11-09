@@ -233,17 +233,6 @@ object HudSession {
      * Se il link è già attivo stabilisce solo la sessione.
      */
     fun connect() {
-        // DIAGNOSTICA TEMPORANEA: mostra CHI chiama connect().
-        // Nel log 2.3.8 connect() veniva invocato a raffica (ogni 0.6-3.4 s)
-        // senza nessuna riga di log del chiamante: questo lo rende visibile.
-        runCatching {
-            val who = Throwable().stackTrace
-                .drop(1)
-                .take(4)
-                .joinToString(" < ") { "${it.className.substringAfterLast('.')}.${it.methodName}:${it.lineNumber}" }
-            AppLog.i(TAG, "connect() chiamato da: $who")
-        }
-
         wantsConnection = true
         val streamController = stream ?: return
         val linkController = link ?: return

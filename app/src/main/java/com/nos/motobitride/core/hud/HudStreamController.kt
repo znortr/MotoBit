@@ -123,6 +123,19 @@ class HudStreamController(
     // (l'app ufficiale Carbit-Ride non presenta il problema, quindi e' un
     // comportamento dipendente dalla nostra app).
     private var wifiLock: WifiManager.WifiLock? = null
+
+    /**
+     * "Schermo sempre acceso": evita che il telefono vada in sospensione.
+     *
+     * In sospensione Android **revoca la MediaProjection**: il mirroring muore e
+     * il TFT resta sull'ultima immagine (visto nel log 11:51:15).
+     */
+    private var screenWakeLock: android.os.PowerManager.WakeLock? = null
+
+    /** Serializza start()/attachMirroring(): senza, due chiamate concorrenti
+     *  creavano DUE encoder (log 11:51:12 "Encoder configurato" due volte) e
+     *  stampavano tre volte "MIRRORING ATTIVO". */
+    private val mirrorLock = Any()
     @Volatile
     private var stopRequested = false
 
@@ -513,6 +526,13 @@ class HudStreamController(
     // ------------------------------------------------------------------
 
     fun start() {
+        // Serializzato con attachMirroring(): senza, due chiamate concorrenti
+        // (pendingLaunch + effetto UI) creavano due encoder e stampavano tre
+        // volte "MIRRORING ATTIVO" (log 11:51:12).
+        synchronized(mirrorLock) { startLocked() }
+    }
+
+    private fun startLocked() {
         videoWanted = true
         stopRequested = false
         streamPaused = false
@@ -611,7 +631,9 @@ class HudStreamController(
      * sveglia la radio Wi-Fi per tutto il mirroring e impediscono al power-save
      * di degradare i canali TCP verso il TFT.
      */
+    @Suppress("DEPRECATION")
     private fun acquireStreamLocks() {
+        acquireScreenWakeLock()
         if (wifiLock?.isHeld == true) return
         try {
             wifiLock = wifiManager.createWifiLock(
@@ -626,7 +648,52 @@ class HudStreamController(
         }
     }
 
+    /**
+     * Tiene acceso lo schermo finché dura lo streaming.
+     *
+     * `SCREEN_BRIGHT_WAKE_LOCK` è deprecato ma è l'unico che tiene acceso il
+     * display anche con un'altra app in primo piano (Maps). `FLAG_KEEP_SCREEN_ON`
+     * funzionerebbe solo dentro la nostra Activity.
+     */
+    @Suppress("DEPRECATION")
+    private fun acquireScreenWakeLock() {
+        if (screenWakeLock?.isHeld == true) return
+        try {
+            val pm = context.getSystemService(Context.POWER_SERVICE) as? android.os.PowerManager
+            if (pm == null) {
+                AppLog.w(TAG, "PowerManager non disponibile: schermo sempre acceso non attivo")
+                return
+            }
+            screenWakeLock = pm.newWakeLock(
+                android.os.PowerManager.SCREEN_BRIGHT_WAKE_LOCK or
+                        android.os.PowerManager.ACQUIRE_CAUSES_WAKEUP,
+                "motobit:screen"
+            ).apply {
+                setReferenceCounted(false)
+                acquire()
+            }
+            AppLog.i(TAG, "SCREEN_WAKE_LOCK acquisito (schermo sempre acceso)")
+        } catch (t: Throwable) {
+            AppLog.w(TAG, "SCREEN_WAKE_LOCK non acquisito: ${t.message}")
+        }
+    }
+
+    /** Rilascia SOLO lo schermo sempre acceso (usato da stop(): la sessione resta). */
+    private fun releaseScreenWakeLock() {
+        try {
+            if (screenWakeLock?.isHeld == true) {
+                screenWakeLock?.release()
+                AppLog.i(TAG, "SCREEN_WAKE_LOCK rilasciato")
+            }
+        } catch (t: Throwable) {
+            AppLog.w(TAG, "SCREEN_WAKE_LOCK release fallito: ${t.message}")
+        }
+        screenWakeLock = null
+    }
+
     private fun releaseStreamLocks() {
+        releaseScreenWakeLock()
+
         try {
             if (wifiLock?.isHeld == true) {
                 wifiLock?.release()
@@ -662,6 +729,9 @@ class HudStreamController(
             encoderPaused = true
             encoder?.pause()
         }
+
+        // Video fermo: lo schermo può tornare a spegnersi.
+        releaseScreenWakeLock()
 
         _state.value = if (isRunning) StreamState.CONNECTED else StreamState.IDLE
         _status.value = "Connesso · video fermo"
@@ -1321,7 +1391,11 @@ class HudStreamController(
     }
 
     /** @return true se encoder + VirtualDisplay sono attivi */
-    private fun attachMirroring(): Boolean {
+    private fun attachMirroring(): Boolean = synchronized(mirrorLock) {
+        attachMirroringLocked()
+    }
+
+    private fun attachMirroringLocked(): Boolean {
         if (encoder != null && virtualDisplay != null) return true
 
         val mp = mediaProjection ?: return false

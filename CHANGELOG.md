@@ -4,6 +4,41 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🚀 2.4.0 — Schermo sempre acceso + lock anti-race su start/mirroring
+
+**Data**: 2026-11-07 · **versionCode**: 2400
+
+### 1. Schermo sempre acceso (evita la revoca della proiezione)
+`HudStreamController` acquisisce un **`SCREEN_BRIGHT_WAKE_LOCK`** (con
+`ACQUIRE_CAUSES_WAKEUP`) in `acquireStreamLocks()` e lo rilascia in
+`releaseStreamLocks()`.
+
+| | |
+|---|---|
+| **Perché** | in sospensione Android **revoca la MediaProjection**: era la causa dello schermo nero del log 11:51 |
+| **Perché non `FLAG_KEEP_SCREEN_ON`** | funzionerebbe solo dentro la nostra Activity, non con Maps in primo piano |
+| **Rilascio su `stop()`** | con "Ferma mirroring" lo schermo può tornare a spegnersi (la sessione resta viva) |
+
+Log: `SCREEN_WAKE_LOCK acquisito (schermo sempre acceso)` / `rilasciato`.
+
+### 2. Lock su `start()` / `attachMirroring()`
+Nel log 11:51 comparivano **due** `Encoder configurato` e **tre** `MIRRORING ATTIVO`:
+due chiamate concorrenti entravano in `attachMirroring()` con `encoder == null`
+e creavano due encoder.
+
+Nuovo `mirrorLock`:
+```kotlin
+fun start() { synchronized(mirrorLock) { startLocked() } }
+private fun attachMirroring(): Boolean = synchronized(mirrorLock) { attachMirroringLocked() }
+```
+La seconda chiamata trova encoder e display giá creati e ritorna subito.
+
+### Pulizia
+Rimosso il log diagnostico con lo stack in `HudSession.connect()` (2.3.11): il
+chiamante era `requestAutoConnect` (tocco) + l'effetto auto della Home.
+
+---
+
 ## 🐛 2.3.12 — Schermo nero dopo la sospensione: l'encoder non si fermava
 
 **Data**: 2026-11-07 · **versionCode**: 2312
