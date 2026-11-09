@@ -15,6 +15,9 @@ import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.navigation.AppNavGraph
 import com.nos.motobitride.ui.theme.MotobitRideTheme
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -28,7 +31,12 @@ class MainActivity : ComponentActivity() {
 
         // Controllo giornaliero delle scadenze (revisione/tassa/assicurazione).
         // Idempotente: WorkManager non duplica il lavoro gia' pianificato.
-        DeadlineWorker.schedule(applicationContext)
+        //
+        // FUORI dal main thread: WorkManager inizializza un database Room
+        // (SQLite) e sul thread principale rallentava l'avvio dell'app.
+        CoroutineScope(Dispatchers.IO).launch {
+            runCatching { DeadlineWorker.schedule(applicationContext) }
+        }
 
         // Abilita il salvataggio automatico del log su file (Documenti):
         // i test lunghi superano il ring buffer e perderebbero l'inizio.

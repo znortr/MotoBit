@@ -44,6 +44,7 @@ import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
@@ -79,7 +80,9 @@ import com.nos.motobitride.feature.ap.WifiApController
 import com.nos.motobitride.ui.components.MotobitTopAppBar
 import com.nos.motobitride.ui.i18n.AppLanguage
 import com.nos.motobitride.ui.i18n.AppTexts
+import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.withContext
 
 private const val TAG_UI = "HudScreen"
 
@@ -251,10 +254,21 @@ fun HudScreen(
 
     // ---------------- App in Home ----------------
     val appPackages by SavedApps.packages.collectAsState()
-    val allApps = remember(isPreview) {
-        if (isPreview) emptyList() else InstalledApps.load(ctx)
+
+    // Elenco app caricato FUORI dal thread principale.
+    //
+    // Prima girava dentro `remember { }` durante la PRIMA composizione della
+    // Home: `queryIntentActivities` + `getApplicationLabel` + `getApplicationIcon`
+    // per OGNI app installata, sul main thread → avvio lento e jank.
+    val allApps by produceState(initialValue = emptyList<AppInfo>(), isPreview) {
+        if (isPreview) return@produceState
+        value = withContext(Dispatchers.IO) { InstalledApps.load(ctx) }
     }
+
     LaunchedEffect(allApps) {
+        // Solo con l'elenco vero: con la lista iniziale vuota si cancellerebbero
+        // tutte le app salvate.
+        if (allApps.isEmpty()) return@LaunchedEffect
         SavedApps.pruneMissing(InstalledApps.installedPackages(allApps))
     }
     val selectedApps = remember(appPackages, allApps) {

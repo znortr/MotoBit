@@ -8,6 +8,6 @@
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
 
-    <!-- Sfondo della schermata di avvio (dietro l'immagine di splash) -->
-    <color name="splash_background">#FF0B0B0D</color>
+    <!-- Sfondo dell'app (usato come windowBackground: avvio scuro, niente lampo bianco) -->
+    <color name="app_background">#FF0B0B0D</color>
 </resources>

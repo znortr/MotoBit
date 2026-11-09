@@ -7,7 +7,7 @@
         nere, senza il lampo bianco del tema Light di default.
     -->
     <style name="Theme.MotobitRide" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/splash_background</item>
+        <item name="android:windowBackground">@color/app_background</item>
     </style>
 
     <!--

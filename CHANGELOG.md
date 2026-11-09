@@ -4,6 +4,43 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## ⚡ 2.4.1 — Avvio più rapido: due lavori pesanti tolti dal main thread
+
+**Data**: 2026-11-07 · **versionCode**: 2401
+
+### 1. Elenco app installate (la causa principale)
+```kotlin
+// PRIMA — dentro la prima composizione della Home, sul MAIN THREAD
+val allApps = remember { InstalledApps.load(ctx) }
+```
+`queryIntentActivities` + `getApplicationLabel` + **`getApplicationIcon` per ogni
+app installata**: con centinaia di app sono centinaia di millisecondi di blocco
+sull'avvio.
+
+```kotlin
+// ORA — su Dispatchers.IO, la UI parte subito
+val allApps by produceState(initialValue = emptyList<AppInfo>(), isPreview) {
+    value = withContext(Dispatchers.IO) { InstalledApps.load(ctx) }
+}
+```
+E `pruneMissing()` viene saltata se la lista è ancora vuota (altrimenti al primo
+frame avrebbe cancellato tutte le app salvate).
+
+### 2. WorkManager
+`DeadlineWorker.schedule()` inizializza un database **Room/SQLite**: spostato su
+`Dispatchers.IO`. L'`init` delle preferenze resta sul main (veloce e necessario).
+
+### Pulizia splash
+Verificato: **nessun file** `*splash*` e nessun tema `*.Splash`. Restava solo il
+nome del colore: `splash_background` → **`app_background`** (`#0B0B0D`), usato
+come `windowBackground` e `windowSplashScreenBackground` (= sfondo nero).
+
+### Nota
+Questa è una build **debug** (senza R8): la release è sensibilmente più rapida
+all'avvio. Se serve la massima velocità, va provata una `assembleRelease`.
+
+---
+
 ## 🚀 2.4.0 — Schermo sempre acceso + lock anti-race su start/mirroring
 
 **Data**: 2026-11-07 · **versionCode**: 2400

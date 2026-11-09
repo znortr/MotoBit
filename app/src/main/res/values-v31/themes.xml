@@ -7,8 +7,8 @@
         e' annotata nel TODO a priorita' molto bassa.)
     -->
     <style name="Theme.MotobitRide" parent="android:Theme.Material.Light.NoActionBar">
-        <item name="android:windowBackground">@color/splash_background</item>
-        <item name="android:windowSplashScreenBackground">@color/splash_background</item>
+        <item name="android:windowBackground">@color/app_background</item>
+        <item name="android:windowSplashScreenBackground">@color/app_background</item>
     </style>
 
 </resources>
