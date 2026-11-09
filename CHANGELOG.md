@@ -4,6 +4,32 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.2 — Il secondo consenso non esiste più (percorso unico)
+
+**Data**: 2026-11-07 · **versionCode**: 2302
+
+### L'errore della 2.3.0
+Avevo messo una **toppa** invece di eliminare il secondo percorso:
+```kotlin
+if (StreamLaunchActivity.active) return   // ← toppa
+```
+Non copriva tutti i casi (Activity distrutta durante l'attesa, revoca della
+proiezione, ecc.). Con il TFT spento l'attesa dura minuti: l'Activity viene
+distrutta dal sistema, `active` torna `false` e la Home apriva di nuovo il
+dialog — portando MotoBit in primo piano.
+
+### Fix strutturale
+| Intervento | Effetto |
+|---|---|
+| **Rimosso** da `HudScreen`: `screenCaptureLauncher`, `requestScreenCapture()`, l'effetto su `AWAITING_PROJECTION` | la Home **non può più** chiedere il consenso |
+| Il consenso lo chiede **solo** `StreamLaunchActivity` | un solo dialogo, sempre sopra l'app dell'utente |
+| Pulsante "Avvia mirroring" in Home, se manca la proiezione | delega a `StreamLaunchActivity` (`requestConsentThroughLauncher()`) |
+| `MediaProjection.onStop` (revoca) | **non** imposta più `AWAITING_PROJECTION`: aggiorna solo il messaggio |
+
+Nessun flag da mantenere: il secondo percorso **non esiste più** nel codice.
+
+---
+
 ## ⚡ 2.3.1 — Pre-riscaldamento del solo link (opzione C)
 
 **Data**: 2026-11-07 · **versionCode**: 2301

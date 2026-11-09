@@ -687,14 +687,14 @@ class HudStreamController(
                     unregisterProjectionCallback()
                     mediaProjection = null
                     if (isRunning) {
-                        _state.value = StreamState.AWAITING_PROJECTION
-                        // Su Android 14+ il consenso puo' essere chiesto solo con
-                        // l'app visibile: se la revoca arriva in background il
-                        // flusso resta fermo finche' l'utente non riapre l'app.
-                        // Il messaggio finisce anche nella notifica.
+                        // NON si passa ad AWAITING_PROJECTION: quello stato faceva
+                        // scattare il consenso "legacy" della Home (secondo
+                        // dialogo + MotoBit in primo piano). Si aggiorna solo lo
+                        // stato mostrato; il nuovo consenso lo chiede
+                        // StreamLaunchActivity alla prossima richiesta.
                         _status.value =
-                            "Cattura schermo revocata: riapri MotoBit per riprendere"
-                        AppLog.w(TAG, "Serve un nuovo consenso alla cattura schermo")
+                            "Cattura schermo revocata: riavvia il mirroring"
+                        AppLog.w(TAG, "Proiezione revocata: serve un nuovo consenso")
                     }
                 }
             }

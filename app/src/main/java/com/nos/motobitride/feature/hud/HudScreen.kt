@@ -132,73 +132,27 @@ fun HudScreen(
         else ctx.getSystemService(Context.MEDIA_PROJECTION_SERVICE) as? MediaProjectionManager
     }
 
-    var projectionRequested by remember { mutableStateOf(false) }
-
-    val screenCaptureLauncher = rememberLauncherForActivityResult(
-        contract = ActivityResultContracts.StartActivityForResult()
-    ) { result ->
-        projectionRequested = false
-        if (result.resultCode == Activity.RESULT_OK && result.data != null) {
-            AppLog.i(TAG_UI, "Consenso cattura schermo concesso")
-            try {
-                ScreenCaptureService.startService(ctx, result.resultCode, result.data!!)
-            } catch (t: Throwable) {
-                AppLog.e(TAG_UI, "Avvio ScreenCaptureService fallito", t)
-                Toast.makeText(
-                    ctx,
-                    "Cattura schermo fallita: ${t.message}",
-                    Toast.LENGTH_LONG
-                ).show()
-            }
-        } else {
-            AppLog.w(TAG_UI, "Consenso cattura schermo negato")
-        }
-    }
-
-    fun requestScreenCapture() {
-        if (projectionRequested || isPreview) return
-
-        // M2 — Il consenso ha UN SOLO proprietario.
-        //
-        // Se e' in corso il flusso di StreamLaunchActivity (che chiede gia' lui
-        // il consenso e ha lui l'Activity visibile), la Home NON deve aprire un
-        // secondo dialog: da background riuscirebbe ad aprire l'Activity solo
-        // grazie al permesso overlay, portando MotoBit davanti e mandando in
-        // background l'app scelta dall'utente.
-        if (StreamLaunchActivity.active) {
-            AppLog.i(TAG_UI, "Consenso gestito da StreamLaunchActivity: la Home non lo richiede")
-            return
-        }
-
-        projectionRequested = true
-        try {
-            AppLog.i(TAG_UI, "Richiesta consenso cattura schermo")
-            val manager = mediaProjectionManager ?: return
-
-            // Android 14+: il dialog di sistema propone "un'app" o "schermo
-            // intero". Al TFT serve TUTTO lo schermo, quindi si forza il display
-            // di default: il dialog non offre piu' l'opzione app singola.
-            val intent = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.UPSIDE_DOWN_CAKE) {
-                manager.createScreenCaptureIntent(
-                    MediaProjectionConfig.createConfigForDefaultDisplay()
-                )
-            } else {
-                manager.createScreenCaptureIntent()
-            }
-            screenCaptureLauncher.launch(intent)
-        } catch (t: Throwable) {
-            projectionRequested = false
-            AppLog.e(TAG_UI, "Impossibile aprire il dialog di cattura", t)
-        }
-    }
-
-    if (!isPreview) {
-        LaunchedEffect(streamState) {
-            when (streamState) {
-                StreamState.AWAITING_PROJECTION -> requestScreenCapture()
-                else -> projectionRequested = false
-            }
-        }
+    // ------------------------------------------------------------------
+    // PERCORSO UNICO DEL CONSENSO
+    //
+    // La Home NON chiede piu' la cattura schermo: lo fa SOLO
+    // `StreamLaunchActivity` (activity visibile, dialoghi sopra l'app scelta).
+    //
+    // Prima esistevano due percorsi (Home + StreamLaunchActivity): quando lo
+    // stato diventava AWAITING_PROJECTION la Home apriva un SECONDO dialogo e,
+    // partendo dalla sua Activity, portava MotoBit in primo piano mandando in
+    // background l'app scelta. Il flag `active` era una toppa che non copriva
+    // tutti i casi (activity distrutta, revoca della proiezione, ecc.).
+    //
+    // Se serve il consenso, la Home delega a StreamLaunchActivity (senza app da
+    // aprire), che lo gestisce con le stesse regole di sempre.
+    // ------------------------------------------------------------------
+    fun requestConsentThroughLauncher() {
+        if (isPreview) return
+        AppLog.i(TAG_UI, "Consenso: delego a StreamLaunchActivity")
+        runCatching {
+            ctx.startActivity(StreamLaunchActivity.intent(ctx, "", openApp = false))
+        }.onFailure { AppLog.e(TAG_UI, "Avvio StreamLaunchActivity fallito", it) }
     }
 
     val permissionLauncher = rememberLauncherForActivityResult(
@@ -535,7 +489,13 @@ fun HudScreen(
                             HudSession.stopStream()
                         } else {
                             AppLog.i(TAG_UI, "Avvia mirroring")
-                            HudSession.startStream()
+                            // Se manca la proiezione il consenso lo chiede
+                            // StreamLaunchActivity (percorso unico).
+                            if (ScreenCaptureService.mediaProjectionFlow.value == null) {
+                                requestConsentThroughLauncher()
+                            } else {
+                                HudSession.startStream()
+                            }
                         }
                     },
                     enabled = connected
