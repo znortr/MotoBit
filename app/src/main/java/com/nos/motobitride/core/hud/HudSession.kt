@@ -17,6 +17,9 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.delay
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.isActive
 import kotlinx.coroutines.launch
 
@@ -260,7 +263,7 @@ object HudSession {
         wantsConnection = false
         wantsStream = false
         cancelPendingLaunch()
-        autoConnectForSession = false
+        clearAutoConnectForSession()
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()
@@ -286,24 +289,38 @@ object HudSession {
      * **Solo in memoria**: le impostazioni NON vengono toccate; al riavvio
      * dell'app si torna a quanto scelto dall'utente.
      */
-    @Volatile
-    var autoConnectForSession: Boolean = false
-        private set
+    private val _autoConnectForSession = MutableStateFlow(false)
 
     /**
-     * Avvia la connessione come farebbe l'auto-connessione, ma per questa sola
-     * sessione. Se la connessione e' gia' in corso **non fa nulla**: richiamarla
-     * farebbe `teardownP2p()` e riavvierebbe il tentativo da zero (era questa la
-     * causa dei 9/10 fallimenti).
+     * Auto-connessione valida **solo per questa sessione**.
+     *
+     * È un `StateFlow` (non un flag muto) perché la Home deve **reagire**:
+     * è lo stesso effetto che gestisce l'auto delle impostazioni a fare partire
+     * la connessione, con lo stesso codice e lo stesso stato mostrato dal
+     * pulsante grande. Prima era un `var` che nessuno leggeva: lo stato restava
+     * manuale e la connessione non partiva.
      */
+    val autoConnectForSession: StateFlow<Boolean> = _autoConnectForSession.asStateFlow()
+
+    /** Attiva l'auto-connessione per la sola sessione corrente (impostazioni invariate). */
     fun requestAutoConnect() {
-        if (autoConnectForSession) {
-            AppLog.i(TAG, "Auto di sessione gia' attiva: nessun riavvio della connessione")
-            return
+        val alreadyActive = _autoConnectForSession.value
+        if (!alreadyActive) {
+            _autoConnectForSession.value = true
+            AppLog.i(TAG, "Auto di sessione ATTIVA (impostazioni invariate)")
         }
-        autoConnectForSession = true
-        AppLog.i(TAG, "Auto di sessione ATTIVA (impostazioni invariate)")
+        // La connessione parte SUBITO, non tramite l'effetto della Home: il tap
+        // apre l'app scelta e MotoBit va in background, dove il Recomposer di
+        // Compose e' in pausa e l'effetto resterebbe sospeso.
+        // `connect()` e' idempotente: se un tentativo e' in corso lo coalesce.
+        AppLog.i(TAG, "Auto di sessione: avvio procedura di connessione")
         connect()
+    }
+
+    fun clearAutoConnectForSession() {
+        if (!_autoConnectForSession.value) return
+        _autoConnectForSession.value = false
+        AppLog.i(TAG, "Auto di sessione disattivata")
     }
 
     /**
@@ -366,7 +383,7 @@ object HudSession {
         wantsStream = false
         wantsConnection = false
         cancelPendingLaunch()
-        autoConnectForSession = false
+        clearAutoConnectForSession()
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()

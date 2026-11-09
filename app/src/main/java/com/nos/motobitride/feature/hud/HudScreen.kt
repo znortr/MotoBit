@@ -123,6 +123,9 @@ fun HudScreen(
 
     val savedHud by SavedHud.current.collectAsState()
     val autoConnect by AppSettings.autoConnect.collectAsState()
+    // Auto-connessione di SESSIONE (attivata dal tap sull'app): stessa procedura
+    // dell'auto delle impostazioni, solo in memoria.
+    val sessionAuto by HudSession.autoConnectForSession.collectAsState()
     val showHomeDiagnostics by AppSettings.showHomeDiagnostics.collectAsState()
     /** Annullamento dell'attesa automatica, valido solo per questa sessione app. */
     var autoCancelled by remember { mutableStateOf(false) }
@@ -195,11 +198,16 @@ fun HudScreen(
     if (!isPreview) {
         // Reagisce allo switch (sia all'avvio sia se l'utente lo cambia a runtime):
         // con l'automatico attivo si stabilisce SOLO la connessione.
-        LaunchedEffect(autoConnect, savedHud) {
-            if (!autoConnect || autoCancelled) return@LaunchedEffect
+        LaunchedEffect(autoConnect, sessionAuto, savedHud) {
+            if ((!autoConnect && !sessionAuto) || autoCancelled) return@LaunchedEffect
             val hud = savedHud ?: return@LaunchedEffect
             if (streamState == StreamState.IDLE || streamState == StreamState.ERROR) {
-                AppLog.i(TAG_UI, "Auto: connessione verso ${hud.displayName}")
+                AppLog.i(
+                    TAG_UI,
+                    "Auto: connessione verso ${hud.displayName} " +
+                            "(impostazione=$autoConnect, sessione=$sessionAuto)"
+                )
+                // STESSA procedura dell'auto delle impostazioni.
                 HudSession.connect()
             }
         }
@@ -219,7 +227,10 @@ fun HudScreen(
     val mirroring = streamState == StreamState.MIRRORING
     val noBike = savedHud == null
     // Automatico attivo, nessun tentativo in corso: "in attesa del TFT".
-    val autoWaiting = !noBike && autoConnect && !autoCancelled && !connected && !working
+    // Lo stato mostrato considera anche l'auto di sessione: prima guardava solo
+    // l'impostazione, quindi il pulsante restava "manuale".
+    val autoWaiting = !noBike && (autoConnect || sessionAuto) &&
+            !autoCancelled && !connected && !working
 
 
     val linkConnected = wifiController?.isHudConnected ?: false

@@ -4,6 +4,41 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.4 — L'auto di sessione ora è VERA (era un flag che nessuno leggeva)
+
+**Data**: 2026-11-07 · **versionCode**: 2304
+
+### Perché non partiva e lo stato restava manuale
+In 2.3.3 `autoConnectForSession` era un semplice `var`:
+- **nessuno lo leggeva** → il pulsante e lo stato restavano quelli dell'impostazione
+  (manuale) perché la Home guardava solo `AppSettings.autoConnect`;
+- la connessione era avviata dall'effetto della Home, ma al tap l'app scelta va in
+  **primo piano** e MotoBit va in background: il **Recomposer di Compose va in pausa**
+  e l'effetto resta sospeso → procedura non avviata.
+
+### Fix
+1. `HudSession.autoConnectForSession` è ora uno **`StateFlow<Boolean>`**: la Home
+   lo colleziona e **reagisce**.
+2. `HudScreen` usa la **stessa** procedura dell'auto delle impostazioni:
+   ```kotlin
+   LaunchedEffect(autoConnect, sessionAuto, savedHud) {
+       if ((!autoConnect && !sessionAuto) || autoCancelled) return@LaunchedEffect
+       ... HudSession.connect()
+   }
+   ```
+3. `autoWaiting` (colore/testo del pulsante) considera **anche** l'auto di sessione:
+   prima guardava solo l'impostazione.
+4. `requestAutoConnect()` chiama `connect()` **subito**, non tramite l'effetto:
+   il tap apre l'app e MotoBit va in background, dove l'effetto non girerebbe.
+   `connect()` è idempotente, quindi nessun doppio tentativo.
+
+### Risultato
+Tap sull'app senza connessione → **stato passa ad automatico** (pulsante giallo
+"In attesa del TFT…") e la **stessa procedura di connessione automatica** parte
+immediatamente. La bolla AVVIA fa solo lo streaming. Al riavvio: manuale.
+
+---
+
 ## 🔄 2.3.3 — Ritorno alla soluzione utente (auto di sessione)
 
 **Data**: 2026-11-07 · **versionCode**: 2303
