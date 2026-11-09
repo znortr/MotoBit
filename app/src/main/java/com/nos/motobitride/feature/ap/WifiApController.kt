@@ -309,7 +309,19 @@ class WifiApController internal constructor(
      * (Wi-Fi Direct disattivato, `onChannelDisconnected`).
      */
     private fun retryPassive(qr: QrContent.HudWifi) {
-        if (isHudConnected || attemptInFlight) return
+        if (isHudConnected) return
+        if (attemptInFlight) {
+            // Tentativo appeso (il peer non c'era): se e' passata la soglia lo
+            // si rilascia, altrimenti il ritorno del TFT non farebbe ripartire
+            // nulla. Per tentativi recenti si rispetta il coalescing.
+            val stuck = (System.currentTimeMillis() - attemptStartedAt) > ATTEMPT_STUCK_MS
+            if (!stuck) return
+            AppLog.w(
+                TAG,
+                "retry passivo: tentativo appeso da oltre ${ATTEMPT_STUCK_MS / 1000}s, lo rilancio"
+            )
+            attemptInFlight = false
+        }
 
         val manager = p2pManager
         val channel = p2pChannel
@@ -574,6 +586,22 @@ class WifiApController internal constructor(
             // e' solo un transiente.
             if (!isHudConnected) {
                 AppLog.i(TAG, "gruppo P2P non ancora formato (negoziazione in corso)")
+                // Se il connect era stato "accettato" ma il gruppo non si è
+                // formato (TFT spento / fuori portata), `attemptInFlight`
+                // restava true PER SEMPRE: `retryPassive()` (chiamato sui
+                // PEERS_CHANGED) veniva bloccato e il TFT, acceso dopo, non
+                // veniva mai più visto. Soglia 5 s: una negoziazione legittima
+                // dura 1-2 s e non viene toccata da questa riga.
+                if (attemptInFlight &&
+                    (System.currentTimeMillis() - attemptStartedAt) > ATTEMPT_STUCK_MS
+                ) {
+                    AppLog.w(
+                        TAG,
+                        "gruppo non formato dopo ${ATTEMPT_STUCK_MS / 1000}s: " +
+                                "sblocco il tentativo (potro' riprovare)"
+                    )
+                    attemptInFlight = false
+                }
                 return
             }
             AppLog.w(TAG, "gruppo P2P non formato")

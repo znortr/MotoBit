@@ -4,6 +4,46 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.7 — Il TFT acceso DOPO non veniva più visto (tentativo appeso)
+
+**Data**: 2026-11-07 · **versionCode**: 2307
+
+### Sintomo (dal log 10:57)
+TFT spento → tap app → connessione avviata → **accendo il TFT** → nessuna connessione.
+Se invece accendevo prima il TFT e poi avviavo, funzionava.
+
+### Causa — dimostrata dal log
+```
+10:57:51.114  connect richiesta accettata, attendo groupOwner
+10:57:51.545  gruppo P2P non ancora formato (negoziazione in corso)
+10:58:09.379  lista peer aggiornata          ← il TFT è apparso
+              … e non succede NULLA
+```
+`WifiP2pManager.connect()` viene **accettato** dal sistema, ma con il TFT spento
+il gruppo non si forma mai. In quel ramo il codice faceva solo `return`, **senza
+ripristinare `attemptInFlight`**. Da quel momento:
+```kotlin
+private fun retryPassive(qr) {
+    if (isHudConnected || attemptInFlight) return   // ← bloccato per sempre
+}
+```
+Il `PEERS_CHANGED` (TFT apparso) chiama `retryPassive`, che esce subito → nessun
+nuovo tentativo. Con il TFT **già acceso** il gruppo si forma in 1-2 s e il caso
+non si presenta: ecco perché il secondo scenario funzionava.
+
+### Fix (due punti, soglia 5 s)
+1. Nel ramo "gruppo P2P non ancora formato": se il tentativo è più vecchio di
+   `ATTEMPT_STUCK_MS` (5 s) viene **sbloccato** (`attemptInFlight = false`).
+   Una negoziazione legittima dura 1-2 s e non viene toccata.
+2. `retryPassive()`: se il tentativo è appeso oltre la soglia, lo rilancia invece
+   di uscire.
+
+### Effetto
+TFT spento → tap app → AVVIA → accendo il TFT → **entro ~5 s il peer viene
+visto e la connessione riparte da sola**, senza premere altro.
+
+---
+
 ## ⏱️ 2.3.6 — I tentativi di connessione ora hanno un limite
 
 **Data**: 2026-11-07 · **versionCode**: 2306
