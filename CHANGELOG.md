@@ -4,6 +4,38 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.10 — L'attesa attiva non si prolungava all'infinito
+
+**Data**: 2026-11-07 · **versionCode**: 2310
+
+### Dal log 11:32 (build 2.3.8)
+```
+11:32:24.788  Attesa attiva: 5 min
+11:32:26.497  Attesa attiva: 5 min     ← timer riarmato
+11:32:27.180  Attesa attiva: 5 min     ← riarmato
+11:32:27.747  Attesa attiva: 5 min     ← riarmato
+11:32:31.123  Attesa attiva: 5 min     ← riarmato
+11:32:35.297  Attesa attiva: 5 min     ← riarmato
+```
+`connect()` viene richiamato più volte ravvicinate (effetto della Home,
+coalescing sul link, tocchi). Ogni chiamata riarma il timer con
+`cancelActiveWaitTimer()` + `postDelayed`: la scadenza si sposta in avanti e
+l'**attesa attiva non scade mai** → nessun passaggio all'ascolto passivo.
+
+### Fix
+`armActiveWait()` esce subito se il timer è **già armato**:
+```kotlin
+if (passiveRunnable != null) return
+```
+Si riarma solo dopo un successo (`cancelActiveWait`) o una chiusura (`closeAll`).
+
+### Nota sul resto del log
+Lo streaming **funziona**: `MIRRORING ATTIVO 592x752`, `flusso encoder: 28 fps`,
+`273 frame inviati`. L'attesa della negoziazione (2.3.8) ha evitato la revoca
+della proiezione.
+
+---
+
 ## ⚡ 2.3.9 — Connessione più rapida: retry a tempo, non solo a eventi
 
 **Data**: 2026-11-07 · **versionCode**: 2309

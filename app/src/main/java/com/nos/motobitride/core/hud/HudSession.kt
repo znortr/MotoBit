@@ -160,6 +160,15 @@ object HudSession {
     // ------------------------------------------------------------------
 
     private fun armActiveWait() {
+        // Se il timer è già armato NON lo si prolunga.
+        //
+        // `connect()` viene richiamato più volte ravvicinate (effetto della
+        // Home, coalescing sul link, tocchi): ri-armare ogni volta spostava la
+        // scadenza in avanti e l'attesa attiva non scadeva MAI (visto in log:
+        // "Attesa attiva: 5 min" ripetuto ogni 0.6-3.4 s).
+        // Il timer viene azzerato solo al successo (cancelActiveWait) o alla
+        // chiusura (closeAll).
+        if (passiveRunnable != null) return
         cancelActiveWaitTimer()
         val minutes = AppSettings.activeWaitMinutes.value
         val runnable = Runnable {
