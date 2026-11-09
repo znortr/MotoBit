@@ -447,6 +447,44 @@ adatta** alla splash di sistema, che mostra l'icona inun cerchio.
 
 ---
 
+## 14. Connessione lenta con il TFT spento — **DA VERIFICARE**
+
+**Rilevato dall'utente (09/11/2026)**: *"sembra funzionare un po' lento"*.
+
+### I dati misurati (log 11:50-11:51, build 2.3.11)
+```
+11:50:32.403  Wi-Fi Direct verso DIRECT-VOGE-033990
+11:50:33.240  connect richiesta accettata, attendo groupOwner
+11:50:48.600  gruppo P2P non ancora formato
+11:50:47.185  Retry P2P #1 tra 3000 ms          ← 2.3.9
+11:50:48.580  retry passivo: connect diretto
+11:51:06.110  lista peer aggiornata
+11:51:07.275  gruppo formato                    ← link in 35 s
+```
+E il tentativo che riesce impiega **0,8 s**: la negoziazione non è lenta,
+è l'**attesa tra un tentativo e l'altro**.
+
+### Cosa è già stato corretto
+| Versione | Fix |
+|---|---|
+| 2.3.7 | sblocco di `attemptInFlight` quando il gruppo non si forma (prima restava true per sempre e il `PEERS_CHANGED` veniva ignorato) |
+| 2.3.9 | dopo lo sblocco si chiama `scheduleRetry()` → ritmo 3→10 s invece che solo su evento (erano 11-13 s) |
+| 2.3.10 | `armActiveWait()` non prolunga più il timer a ogni `connect()` |
+
+### Cosa resta da capire
+- [ ] `WifiP2pManager.connect()` viene **accettato** anche con il peer assente e il
+defunto si scopre solo dall'evento di sistema (~11-13 s dopo). Verificare se è
+possibile un fallimento più rapido.
+- [ ] Valutare un `requestPeers()` prima del `connect`: se il peer non c'è, non
+sprecare il tentativo (e non toccare la macchina a stati).
+- [ ] Misurare `connect` → `PEERS_CHANGED` con TFT acceso (caso buono): atteso 2-4 s.
+- [ ] Ridurre `RETRY_MIN_DELAY_MS` (3 s) quando il peer **è già nella lista**: il
+caso "TFT appena accesso e visibile" dovrebbe partire subito.
+- [ ] Se il TFT impiega 20-30 s ad accendersi, la lentezza è **del TFT**: da
+verificare con un cronometro, per non correggere l'app per un problema hardware.
+
+---
+
 ## ✅ Chiusi / spiegati
 
 ### Notifica di mirroring persistente a app chiusa — **corretto in 2.0.3**
