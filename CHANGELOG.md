@@ -4,6 +4,27 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.5 — Tap: avvio automatico anche con link su ma sessione no
+
+**Data**: 2026-11-07 · **versionCode**: 2305
+
+### Buco trovato
+La condizione era `if (connected || linkConnected)`: con il **link P2P attivo ma la
+sessione HU no** (es. sessione caduta, o link risalito da solo) si entrava nel ramo
+"già connesso" → `StreamLaunchActivity` **senza** avviare la connessione → AVVIA
+non connette più → il flusso restava in attesa per sempre.
+
+### Ora
+```kotlin
+if (!connected) HudSession.requestAutoConnect()   // automatica, solo sessione
+
+if (connected)  → StreamLaunchActivity(openApp = true)   // solo streaming
+else            → bolla AVVIA + apertura app            // connessione in corso
+```
+`connected` = stato della **sessione** (`CONNECTED`/`MIRRORING`), non del solo link.
+
+---
+
 ## 🐛 2.3.4 — L'auto di sessione ora è VERA (era un flag che nessuno leggeva)
 
 **Data**: 2026-11-07 · **versionCode**: 2304

@@ -263,24 +263,27 @@ fun HudScreen(
     var showAppPicker by remember { mutableStateOf(false) }
 
     fun onAppTap(app: AppInfo) {
-        if (connected || linkConnected) {
-            // Scenario 1: TFT connesso -> conferma + consenso + streaming + apertura
-            AppLog.i(TAG_UI, "App scelta (TFT connesso): ${app.packageName}")
+        // 1) Se NON siamo connessi si avvia la procedura AUTOMATICA (la stessa
+        //    delle impostazioni), valida solo per questa sessione. Se l'auto e'
+        //    gia' attiva non cambia nulla: `connect()` e' idempotente.
+        //    Copre anche il caso "link su ma sessione no" (es. sessione caduta).
+        if (!connected) {
+            AppLog.i(TAG_UI, "App scelta senza sessione attiva: avvio procedura automatica")
+            HudSession.requestAutoConnect()
+        }
+
+        if (connected) {
+            // 2a) Sessione pronta: consenso + streaming + apertura app.
+            AppLog.i(TAG_UI, "App scelta (connesso): ${app.packageName}")
             runCatching {
                 ctx.startActivity(
                     StreamLaunchActivity.intent(ctx, app.packageName, openApp = true)
                 )
             }.onFailure { AppLog.e(TAG_UI, "Avvio flusso streaming fallito", it) }
         } else {
-            // Scenario 2 — opzione C: si apre subito l'app e si PRE-RISCALDA solo
-            // il link Wi-Fi Direct (nessuna sessione HU, nessun video). Cosi'
-            // l'AVVIA della bolla completa in 2-4 s invece di 5-15 s, e l'HU non
-            // resta mai con una sessione senza frame.
-            AppLog.i(TAG_UI, "App scelta (TFT non connesso): ${app.packageName}")
-            // SOLUZIONE UTENTE: l'app passa in auto-connessione SOLO per questa
-            // sessione (le impostazioni restano invariate) e la connessione
-            // parte SUBITO, una sola volta. La bolla AVVIA poi solo lo streaming.
-            HudSession.requestAutoConnect()
+            // 2b) Connessione in corso: apro l'app e mostro la bolla AVVIA,
+            //     che si occupera' SOLO dello streaming.
+            AppLog.i(TAG_UI, "App scelta (connessione in corso): ${app.packageName}")
             StartBubbleService.show(ctx, app.packageName)
             InstalledApps.launch(ctx, app.packageName)
         }
