@@ -598,9 +598,15 @@ class WifiApController internal constructor(
                     AppLog.w(
                         TAG,
                         "gruppo non formato dopo ${ATTEMPT_STUCK_MS / 1000}s: " +
-                                "sblocco il tentativo (potro' riprovare)"
+                                "sblocco il tentativo e riprovo a tempo"
                     )
                     attemptInFlight = false
+                    // Riprova A TEMPO. Senza questo il tentativo successivo
+                    // dipendeva solo da un evento (PEERS_CHANGED): nel log i
+                    // tentativi si susseguivano a 11.5 s e 13.7 s, mentre con
+                    // il timer il ritmo e' 3→10 s e il TFT viene preso appena
+                    // e' pronto.
+                    scheduleRetry("gruppo non formato")
                 }
                 return
             }

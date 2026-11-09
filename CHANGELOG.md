@@ -4,6 +4,36 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## ⚡ 2.3.9 — Connessione più rapida: retry a tempo, non solo a eventi
+
+**Data**: 2026-11-07 · **versionCode**: 2309
+
+### Analisi dei tempi (log 11:20:45 → 11:21:14, link in 29 s)
+```
+11:20:45.048  connect accettato
+11:20:45.182  gruppo non formato
+11:20:56.715  sblocco dopo 5s          ← +11,5 s di silenzio
+11:20:58.112  retry passivo → connect
+11:20:58.147  gruppo non formato
+11:21:11.848  sblocco dopo 5s          ← +13,7 s di silenzio
+11:21:13.280  retry passivo → connect
+11:21:14.052  gruppo formato           ← +0,8 s
+```
+
+### Causa
+Lo sblocco del tentativo appeso **non pianificava un nuovo tentativo**: il
+successivo dipendeva solo da un evento (`PEERS_CHANGED`). Quando il TFT diventava
+pronto senza produrre un evento, l'app restava ferma 11-13 s. Il terzo tentativo
+infatti riusciva in **0,8 s**: non era la negoziazione a essere lenta, era
+l'**attesa tra un tentativo e l'altro**.
+
+### Fix
+Dopo lo sblocco si chiama `scheduleRetry("gruppo non formato")`: il ritmo dei
+tentativi torna quello del motore di retry (**3 s → 10 s**) invece di dipendere
+dagli eventi di sistema.
+
+---
+
 ## 🐛 2.3.8 — Lo streaming partiva PRIMA della negoziazione → proiezione revocata
 
 **Data**: 2026-11-07 · **versionCode**: 2308
