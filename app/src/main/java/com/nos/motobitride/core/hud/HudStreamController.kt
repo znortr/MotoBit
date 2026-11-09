@@ -701,12 +701,29 @@ class HudStreamController(
                     releaseVirtualDisplay()
                     unregisterProjectionCallback()
                     mediaProjection = null
+
+                    // Ferma ANCHE l'encoder.
+                    //
+                    // Senza questo, dopo la revoca (es. schermo del telefono in
+                    // sospensione) il pace loop continuava a inviare l'ULTIMO
+                    // frame a 30 fps: il TFT mostrava un'immagine ferma/nera e
+                    // sembrava che lo streaming funzionasse (visto nel log
+                    // 11:51: `flusso encoder: 30 fps` con frame tutti da 1792 B
+                    // e solo 20 catture reali).
+                    cancelEncoderIdleTimer()
+                    if (!encoderPaused) {
+                        encoderPaused = true
+                        encoder?.pause()
+                    }
                     if (isRunning) {
                         // NON si passa ad AWAITING_PROJECTION: quello stato faceva
                         // scattare il consenso "legacy" della Home (secondo
                         // dialogo + MotoBit in primo piano). Si aggiorna solo lo
                         // stato mostrato; il nuovo consenso lo chiede
                         // StreamLaunchActivity alla prossima richiesta.
+                        // Lo stato deve dire la verità: sessione viva ma video
+                        // fermo. Prima restava MIRRORING con zero frame reali.
+                        _state.value = StreamState.CONNECTED
                         _status.value =
                             "Cattura schermo revocata: riavvia il mirroring"
                         AppLog.w(TAG, "Proiezione revocata: serve un nuovo consenso")

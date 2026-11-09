@@ -4,6 +4,40 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🐛 2.3.12 — Schermo nero dopo la sospensione: l'encoder non si fermava
+
+**Data**: 2026-11-07 · **versionCode**: 2312
+
+### Dal log 11:51 (build 2.3.11)
+```
+11:51:12.492  MIRRORING ATTIVO 592x752
+11:51:14.348  cattura schermo: frame #1
+11:51:15.550  W/HudStream: MediaProjection revocata dal sistema/utente   ← schermo in sospensione
+11:51:17.271  flusso encoder: 1 fps
+11:51:27.304  flusso encoder: 30 fps          ← continua a "trasmettere"
+11:51:46.265  Encoder fermato (761 frame inviati, 20 catturati)
+                          ^^^^^^^^^^^^^^^^^^^ 761 frame da 1792 B = sempre lo stesso
+```
+
+### Causa
+Alla revoca della proiezione (schermo del telefono in sospensione) veniva
+rilasciato solo il VirtualDisplay: **l'encoder continuava a inviare l'ultimo
+frame a 30 fps**. Il TFT mostrava un'immagine ferma/nera e sembrava che lo
+streaming fosse attivo → **schermo nero**.
+
+### Fix
+In `MediaProjection.Callback.onStop`:
+- **l'encoder viene messo in pausa** (`encoderPaused = true`, `encoder.pause()`)
+- lo stato passa a **`CONNECTED`** (sessione viva, video fermo) → il pulsante
+  mostra la verità e il riavvio passa da `StreamLaunchActivity` (nuovo consenso)
+
+### Nota
+La soluzione definitiva per la sospensione è la funzione **"schermo sempre
+acceso"** (TODO §5), che evita la revoca. Questo fix evita almeno di mostrare
+a video un frame congelato spacciandolo per streaming.
+
+---
+
 ## 🔍 2.3.11 — Diagnostica: chi chiama `connect()`
 
 **Data**: 2026-11-07 · **versionCode**: 2311
