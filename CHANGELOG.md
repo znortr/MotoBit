@@ -4,6 +4,30 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## ⚡ 2.4.2 — Solo le app scelte sulla Home, elenco completo nel selettore
+
+**Data**: 2026-11-07 · **versionCode**: 2402
+
+### Il problema
+In 2.4.1 la Home caricava comunque **tutte** le app installate su IO: piu' veloce,
+ma la griglia arrivava con un ritardo visibile.
+
+### Ora
+| Dove | Cosa carica | Quando |
+|---|---|---|
+| **Home** | **solo le 2-6 app scelte** (`InstalledApps.loadFor`) | subito, pochi ms |
+| **Selettore AGGIUNGI APP** | elenco **completo** (`InstalledApps.load`) | all'apertura del dialogo |
+
+- La griglia usa `loading = appPackages.isNotEmpty() && selectedApps.isEmpty()`
+  → evita il lampo di "Nessuna app" al primo frame.
+- Il selettore mostra uno **spinner** centrato finché l'elenco non è pronto.
+- Nessuna cache (scelta dell'utente): ogni apertura rilegge lo stato reale, cosi'
+  un'installazione o una disinstallazione si vede subito.
+- Potatura automatica: se un pacchetto salvato non esiste più, viene rimosso
+  quando si caricano le app scelte.
+
+---
+
 ## ⚡ 2.4.1 — Avvio più rapido: due lavori pesanti tolti dal main thread
 
 **Data**: 2026-11-07 · **versionCode**: 2401

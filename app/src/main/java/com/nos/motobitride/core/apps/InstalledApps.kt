@@ -74,6 +74,33 @@ object InstalledApps {
     fun installedPackages(apps: List<AppInfo>): Set<String> =
         apps.map { it.packageName }.toSet()
 
+    /**
+     * Carica label + icona **solo** per i pacchetti indicati.
+     *
+     * Serve alla Home: bastano le 2-6 app scelte, non tutte quelle installate.
+     * Cosi' la griglia appare subito e l'elenco completo si carica solo quando
+     * si apre il selettore. L'ordine di [packages] viene mantenuto.
+     *
+     * I pacchetti non più installati vengono saltati (e il chiamante puo'
+     * potarli confrontando le dimensioni).
+     */
+    fun loadFor(context: Context, packages: List<String>): List<AppInfo> {
+        if (packages.isEmpty()) return emptyList()
+        val pm = context.packageManager
+        return packages.mapNotNull { pkg ->
+            runCatching {
+                val ai: ApplicationInfo = pm.getApplicationInfo(pkg, 0)
+                AppInfo(
+                    packageName = pkg,
+                    label = pm.getApplicationLabel(ai).toString(),
+                    icon = pm.getApplicationIcon(ai)
+                )
+            }.onFailure {
+                AppLog.w(TAG, "App non più installata: $pkg")
+            }.getOrNull()
+        }
+    }
+
     /** Apre l'app. Restituisce false se non ha un launch intent. */
     fun launch(context: Context, packageName: String): Boolean {
         val pm = context.packageManager

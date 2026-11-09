@@ -255,24 +255,23 @@ fun HudScreen(
     // ---------------- App in Home ----------------
     val appPackages by SavedApps.packages.collectAsState()
 
-    // Elenco app caricato FUORI dal thread principale.
-    //
-    // Prima girava dentro `remember { }` durante la PRIMA composizione della
-    // Home: `queryIntentActivities` + `getApplicationLabel` + `getApplicationIcon`
-    // per OGNI app installata, sul main thread → avvio lento e jank.
-    val allApps by produceState(initialValue = emptyList<AppInfo>(), isPreview) {
-        if (isPreview) return@produceState
-        value = withContext(Dispatchers.IO) { InstalledApps.load(ctx) }
-    }
-
-    LaunchedEffect(allApps) {
-        // Solo con l'elenco vero: con la lista iniziale vuota si cancellerebbero
-        // tutte le app salvate.
-        if (allApps.isEmpty()) return@LaunchedEffect
-        SavedApps.pruneMissing(InstalledApps.installedPackages(allApps))
-    }
-    val selectedApps = remember(appPackages, allApps) {
-        appPackages.mapNotNull { pkg -> allApps.firstOrNull { it.packageName == pkg } }
+    // La Home carica SOLO le app scelte (2-6), non tutte quelle installate:
+    // label + icona per 3 app sono pochi ms, la griglia appare subito.
+    // L'elenco completo serve solo al selettore AGGIUNGI APP, che lo carica
+    // quando si apre (con il suo spinner).
+    val selectedApps by produceState(initialValue = emptyList<AppInfo>(), appPackages) {
+        if (isPreview || appPackages.isEmpty()) {
+            value = emptyList()
+            return@produceState
+        }
+        val loaded = withContext(Dispatchers.IO) {
+            InstalledApps.loadFor(ctx, appPackages)
+        }
+        value = loaded
+        // Potatura: se un pacchetto salvato non esiste più, si toglie dalla lista.
+        if (loaded.size != appPackages.size) {
+            SavedApps.pruneMissing(loaded.map { it.packageName }.toSet())
+        }
     }
     var showAppPicker by remember { mutableStateOf(false) }
 
@@ -540,6 +539,8 @@ fun HudScreen(
             // ---------------- Griglia app (2 colonne) ----------------
             AppGrid(
                 apps = selectedApps,
+                // App scelte ma label/icone non ancora caricate (sono su IO)
+                loading = appPackages.isNotEmpty() && selectedApps.isEmpty(),
                 onAppClick = { app -> onAppTap(app) },
                 onAddApp = { showAppPicker = true },
                 emptyText = "Nessuna app in Home: aggiungine una con AGGIUNGI APP",
@@ -547,8 +548,8 @@ fun HudScreen(
             )
 
             if (showAppPicker) {
+                // Il selettore carica da solo l'elenco completo (con spinner).
                 AppPickerDialog(
-                    allApps = allApps,
                     selectedPackages = appPackages.toSet(),
                     onToggle = { SavedApps.toggle(it) },
                     onDismiss = { showAppPicker = false }

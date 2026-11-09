@@ -20,20 +20,29 @@ import androidx.compose.foundation.pager.rememberPagerState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.asImageBitmap
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.core.graphics.drawable.toBitmap
 import com.nos.motobitride.core.apps.AppInfo
+import com.nos.motobitride.core.apps.InstalledApps
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
 
 private const val PAGE_SIZE = 9
 
@@ -46,7 +55,6 @@ private const val PAGE_SIZE = 9
  */
 @Composable
 fun AppPickerDialog(
-    allApps: List<AppInfo>,
     selectedPackages: Set<String>,
     onToggle: (String) -> Unit,
     onDismiss: () -> Unit,
@@ -54,6 +62,16 @@ fun AppPickerDialog(
     doneLabel: String = "Fatto",
     emptyLabel: String = "Nessuna app avviabile trovata."
 ) {
+    // L'elenco COMPLETO delle app si carica qui, all'apertura del selettore:
+    // la Home non deve pagarne il costo (query + label + icona per ogni app).
+    val ctx = LocalContext.current
+    var loading by remember { mutableStateOf(true) }
+    var allApps by remember { mutableStateOf<List<AppInfo>>(emptyList()) }
+    LaunchedEffect(Unit) {
+        allApps = withContext(Dispatchers.IO) { InstalledApps.load(ctx) }
+        loading = false
+    }
+
     val pages = remember(allApps) {
         if (allApps.isEmpty()) emptyList() else allApps.chunked(PAGE_SIZE)
     }
@@ -63,7 +81,16 @@ fun AppPickerDialog(
         onDismissRequest = onDismiss,
         title = { Text(title) },
         text = {
-            if (pages.isEmpty()) {
+            if (loading) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .height(180.dp),
+                    contentAlignment = Alignment.Center
+                ) {
+                    CircularProgressIndicator(modifier = Modifier.size(32.dp), strokeWidth = 3.dp)
+                }
+            } else if (pages.isEmpty()) {
                 Text(emptyLabel, style = MaterialTheme.typography.bodyMedium)
             } else {
                 Column(Modifier.fillMaxWidth()) {

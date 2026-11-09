@@ -4,6 +4,7 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
@@ -13,6 +14,7 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
@@ -40,6 +42,7 @@ fun AppGrid(
     onAppClick: (AppInfo) -> Unit,
     onAddApp: () -> Unit,
     modifier: Modifier = Modifier,
+    loading: Boolean = false,
     emptyText: String = "Nessuna app. Aggiungine una con AGGIUNGI APP.",
     addLabel: String = "AGGIUNGI APP"
 ) {
@@ -47,7 +50,21 @@ fun AppGrid(
         modifier = modifier.fillMaxWidth(),
         verticalArrangement = Arrangement.spacedBy(10.dp)
     ) {
-        if (apps.isEmpty()) {
+        // Evita il lampo di "Nessuna app" al primo frame, quando label e icone
+        // delle app scelte stanno ancora arrivando (caricate su IO).
+        if (loading && apps.isEmpty()) {
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(72.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                CircularProgressIndicator(
+                    modifier = Modifier.size(24.dp),
+                    strokeWidth = 2.dp
+                )
+            }
+        } else if (apps.isEmpty()) {
             Text(
                 text = emptyText,
                 style = MaterialTheme.typography.bodySmall,
