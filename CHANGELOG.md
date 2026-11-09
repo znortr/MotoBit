@@ -4,6 +4,35 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## ⏱️ 2.3.6 — I tentativi di connessione ora hanno un limite
+
+**Data**: 2026-11-07 · **versionCode**: 2306
+
+### Requisito disatteso (richiesto dall'utente, non implementato)
+> *"la ricerca attiva di connessione deve durare come l'attesa attiva della
+> riconnessione (usiamo lo stesso contatore)"*
+
+### Il difetto
+`armActiveWait()` veniva chiamato **solo** in `onHudDisconnected`, cioè alla
+**perdita** di un link già stabilito. Se il TFT non era **mai** stato connesso
+(avvio a TFT spento) il timer non partiva: tentativi P2P **infiniti**, ogni 10 s.
+
+### Fix
+`armActiveWait()` chiamato anche in `HudSession.connect()` quando il link non è
+attivo → **stesso contatore, stessa scadenza, stessa transizione**.
+
+| Situazione | Prima | Ora |
+|---|---|---|
+| Sessione persa dopo essere stata connessa | 5 min → passivo | 5 min → passivo |
+| **Mai connesso** (TFT spento all'avvio) | **infinito** | **5 min → passivo** |
+| TFT appare entro il tempo | si connette | si connette |
+| TFT appare dopo (passivo) | — | si riconnette al `PEERS_CHANGED` |
+| Tap manuale dopo la scadenza | — | riparte (il teardown azzera `passiveWait`) |
+
+Il valore è **Impostazioni → Connessioni → Attesa attiva** (default 5, min 1, max 30).
+
+---
+
 ## 🐛 2.3.5 — Tap: avvio automatico anche con link su ma sessione no
 
 **Data**: 2026-11-07 · **versionCode**: 2305

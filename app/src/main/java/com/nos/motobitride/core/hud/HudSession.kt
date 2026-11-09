@@ -234,6 +234,11 @@ object HudSession {
                 AppLog.w(TAG, "connect(): nessun HUD memorizzato")
                 return
             }
+            // Limite dei tentativi = "attesa attiva" (stesso contatore della
+            // riconnessione). Prima il timer veniva armato SOLO alla perdita
+            // del link: con il TFT mai connesso (avvio a TFT spento) i tentativi
+            // proseguivano all'infinito ogni 10 s.
+            armActiveWait()
             linkController.connect(qr)
         } else {
             streamController.setPreferredHost(
