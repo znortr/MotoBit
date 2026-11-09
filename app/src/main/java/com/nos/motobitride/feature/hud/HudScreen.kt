@@ -266,7 +266,10 @@ fun HudScreen(
             // l'AVVIA della bolla completa in 2-4 s invece di 5-15 s, e l'HU non
             // resta mai con una sessione senza frame.
             AppLog.i(TAG_UI, "App scelta (TFT non connesso): ${app.packageName}")
-            HudSession.preWarmLink()
+            // SOLUZIONE UTENTE: l'app passa in auto-connessione SOLO per questa
+            // sessione (le impostazioni restano invariate) e la connessione
+            // parte SUBITO, una sola volta. La bolla AVVIA poi solo lo streaming.
+            HudSession.requestAutoConnect()
             StartBubbleService.show(ctx, app.packageName)
             InstalledApps.launch(ctx, app.packageName)
         }

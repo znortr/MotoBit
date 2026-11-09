@@ -133,7 +133,6 @@ private fun StreamLaunchScreen(
     val hasHud = SavedHud.current.value != null
 
     var cancelled by remember { mutableStateOf(false) }
-    var connectStartedHere by remember { mutableStateOf(false) }
 
     // Guardia: il consenso si chiede UNA volta per istanza di Activity.
     // (Con `noHistory` nel manifest l'Activity veniva finita quando compariva il
@@ -151,7 +150,6 @@ private fun StreamLaunchScreen(
         } else {
             AppLog.w("StreamLaunch", "Consenso negato: mirroring non avviato")
             cancelled = true
-            rollbackIfNeeded(openApp, connectStartedHere)
             onFinish()
         }
     }
@@ -187,10 +185,14 @@ private fun StreamLaunchScreen(
         HudSession.armPendingLaunch(packageName, openApp)
 
         requestConsentIfNeeded()
-        if (!connected) {
-            connectStartedHere = true
-            HudSession.connect()
-        }
+
+        // NON si chiama connect() qui.
+        //
+        // La connessione e' gia' in corso (auto di sessione avviata dal tocco
+        // sull'app). `HudSession.connect()` con il link non ancora attivo
+        // esegue `teardownP2p()` e RIparte da zero: premere AVVIA a meta'
+        // connessione la azzerava (era questa la causa di "9 volte su 10 non si
+        // connette").
     }
 
     // Quando lo streaming parte, questa schermata ha finito il suo lavoro.
@@ -216,20 +218,9 @@ private fun StreamLaunchScreen(
                 // proiezione: va fermato, altrimenti l'indicatore di
                 // condivisione resta acceso senza trasmettere nulla.
                 ScreenCaptureService.stopService(ctx)
-                rollbackIfNeeded(openApp, connectStartedHere)
                 onFinish()
             }
         )
-    }
-}
-
-/** Se la connessione è stata avviata da questa schermata e non si trasmette, la si chiude. */
-private fun rollbackIfNeeded(openApp: Boolean, connectStartedHere: Boolean) {
-    if (openApp || !connectStartedHere) return
-    val state = HudSession.stream?.state?.value
-    if (state != StreamState.MIRRORING) {
-        AppLog.i("StreamLaunch", "Annullato: chiudo la connessione avviata qui")
-        runCatching { HudSession.disconnect() }
     }
 }
 

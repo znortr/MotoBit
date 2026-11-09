@@ -4,6 +4,28 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🔄 2.3.3 — Ritorno alla soluzione utente (auto di sessione)
+
+**Data**: 2026-11-07 · **versionCode**: 2303
+
+### Rimosso (opzione C e pezze)
+- `HudSession.preWarmLink()` / `schedulePreWarmExpiry()` / `cancelPreWarm()`
+- `HudSession.connect()` chiamata da `StreamLaunchActivity`
+- `rollbackIfNeeded()` e `connectStartedHere`
+
+### Nuovo (soluzione utente)
+- `HudSession.autoConnectForSession`: **solo in memoria**, le impostazioni NON
+  vengono toccate (al riavvio si torna a quanto scelto).
+- `HudSession.requestAutoConnect()`: attiva il flag e chiama `connect()` **una volta**.
+- Tap sull'app senza connessione → `requestAutoConnect()` + bolla + apertura app.
+- **AVVIA** → consenso + `armPendingLaunch` → *solo streaming* (nessuna connessione).
+
+### Nota
+Resta il percorso unico del consenso (2.3.2): solo `StreamLaunchActivity`
+può aprire il dialogo di cattura.
+
+---
+
 ## 🐛 2.3.2 — Il secondo consenso non esiste più (percorso unico)
 
 **Data**: 2026-11-07 · **versionCode**: 2302

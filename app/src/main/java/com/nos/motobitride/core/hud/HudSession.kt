@@ -260,7 +260,7 @@ object HudSession {
         wantsConnection = false
         wantsStream = false
         cancelPendingLaunch()
-        cancelPreWarm()
+        autoConnectForSession = false
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()
@@ -275,76 +275,35 @@ object HudSession {
     private var pendingLaunchPackage: String? = null
     private var pendingLaunchOpenApp: Boolean = false
 
-    private var preWarmJob: Job? = null
-
     // ------------------------------------------------------------------
-    // Pre-riscaldamento del LINK (opzione C)
+    // Auto-connessione di SESSIONE (soluzione dell'utente)
     // ------------------------------------------------------------------
 
     /**
-     * Avvia **solo il link Wi-Fi Direct** verso il TFT, senza creare la sessione
-     * HU e senza video.
+     * Vero quando l'utente ha toccato un'app senza essere connesso: da quel
+     * momento l'app si comporta come se l'avvio automatico fosse attivo.
      *
-     * Perché: il grosso dell'attesa (5-15 s) è la negoziazione P2P; la sessione
-     * Go dura ~1 s. Pre-riscaldando il link al tocco dell'app, il successivo
-     * AVVIA della bolla completa in 2-4 s. La sessione HU non resta mai inattiva
-     * per minuti (rischio non testato con l'HU).
-     *
-     * Scadenza (Q5 = B): dopo `attesa attiva` minuti senza streaming il link
-     * viene chiuso (se era su) o si passa in ascolto passivo (se non era su).
+     * **Solo in memoria**: le impostazioni NON vengono toccate; al riavvio
+     * dell'app si torna a quanto scelto dall'utente.
      */
-    fun preWarmLink() {
-        val linkController = link ?: return
-        if (linkController.isHudConnected) {
-            AppLog.i(TAG, "preWarm: link già attivo")
+    @Volatile
+    var autoConnectForSession: Boolean = false
+        private set
+
+    /**
+     * Avvia la connessione come farebbe l'auto-connessione, ma per questa sola
+     * sessione. Se la connessione e' gia' in corso **non fa nulla**: richiamarla
+     * farebbe `teardownP2p()` e riavvierebbe il tentativo da zero (era questa la
+     * causa dei 9/10 fallimenti).
+     */
+    fun requestAutoConnect() {
+        if (autoConnectForSession) {
+            AppLog.i(TAG, "Auto di sessione gia' attiva: nessun riavvio della connessione")
             return
         }
-        val qr = SavedHud.current.value?.toQrContent() ?: run {
-            AppLog.w(TAG, "preWarm: nessun HUD memorizzato")
-            return
-        }
-
-        AppLog.i(TAG, "preWarm: avvio del solo link P2P (nessuna sessione)")
-        // NB: `wantsConnection` resta FALSE di proposito. Se fosse true, al
-        // formarsi del link `onLinkRestored()` farebbe partire subito la
-        // sessione HU, che resterebbe INATTIVA finche' l'utente non tocca
-        // AVVIA (rischio non testato con l'HU). La sessione nasce solo ad AVVIA.
-        linkController.connect(qr)
-        schedulePreWarmExpiry()
-    }
-
-    private fun schedulePreWarmExpiry() {
-        preWarmJob?.cancel()
-        val minutes = AppSettings.activeWaitMinutes.value
-        preWarmJob = scope?.launch {
-            delay(minutes * 60_000L)
-            preWarmJob = null
-
-            // Non si rilascia nulla se: si sta trasmettendo, l'utente ha gia'
-            // chiesto la connessione (AVVIA premuto) o c'e' un avvio in attesa
-            // del consenso. Altrimenti si rischierebbe di chiudere il link
-            // proprio mentre l'utente sta completando l'avvio.
-            if (wantsStream || wantsConnection || pendingLaunchJob != null ||
-                stream?.state?.value == StreamState.MIRRORING
-            ) {
-                AppLog.i(TAG, "preWarm: avvio gia' in corso, nessun rilascio")
-                return@launch
-            }
-
-            val linkController = link
-            if (linkController?.isHudConnected == true) {
-                AppLog.i(TAG, "preWarm scaduto ($minutes min): chiudo il link")
-                disconnect()
-            } else {
-                AppLog.i(TAG, "preWarm scaduto ($minutes min): ascolto passivo")
-                linkController?.setPassiveWait(true)
-            }
-        }
-    }
-
-    fun cancelPreWarm() {
-        preWarmJob?.cancel()
-        preWarmJob = null
+        autoConnectForSession = true
+        AppLog.i(TAG, "Auto di sessione ATTIVA (impostazioni invariate)")
+        connect()
     }
 
     /**
@@ -407,7 +366,7 @@ object HudSession {
         wantsStream = false
         wantsConnection = false
         cancelPendingLaunch()
-        cancelPreWarm()
+        autoConnectForSession = false
         cancelActiveWaitTimer()
         stream?.close()
         link?.disconnect()
