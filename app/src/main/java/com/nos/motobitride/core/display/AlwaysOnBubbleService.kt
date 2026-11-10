@@ -93,6 +93,26 @@ class AlwaysOnBubbleService : Service() {
     }
 
     /**
+     * L'utente chiude l'app (swipe dal registro o pulsante «Chiudi»): la bolla
+     * è il **telecomando** di quella sessione, quindi muore con lei.
+     *
+     * Si ripristina anche il display: lasciarlo modificato senza la bolla
+     * significherebbe un telefono ridimensionato e scurito senza comando per
+     * tornare indietro (resterebbe solo il tasto accensione).
+     *
+     * Nota: se invece è il **sistema** a uccidere il servizio, `START_STICKY`
+     * lo fa ripartire e la bolla torna: quello è il caso da coprire.
+     */
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        AppLog.i(TAG, "App chiusa: rimuovo la bolla e ripristino il display")
+        Thread {
+            runCatching { DisplayMaster.restoreAll(applicationContext) }
+            runCatching { stopSelf() }
+        }.start()
+        super.onTaskRemoved(rootIntent)
+    }
+
+    /**
      * Quando la risoluzione (o la densità) cambia, lo schermo diventa più
      * piccolo: la bolla va riportata **dentro** i nuovi limiti, altrimenti resta
      * fuori e non si vede più.

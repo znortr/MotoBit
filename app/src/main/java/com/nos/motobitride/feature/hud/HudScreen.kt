@@ -607,6 +607,9 @@ fun HudScreen(
                             // notifica che non esiste piu'.
                             ScreenCaptureService.stopService(ctx)
                             StartBubbleService.hide(ctx)
+                            // La bolla "telefono sul manubrio" è il telecomando
+                            // della sessione: si spegne con l'app.
+                            com.nos.motobitride.core.display.AlwaysOnBubbleService.hide(ctx)
                             HudSession.closeAll()
                             ctx.getActivity()?.finishAndRemoveTask()
                         }
