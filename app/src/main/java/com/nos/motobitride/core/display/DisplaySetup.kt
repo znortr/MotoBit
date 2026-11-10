@@ -5,6 +5,7 @@ import android.content.pm.PackageManager
 import android.provider.Settings
 import com.nos.motobitride.core.log.AppLog
 import com.nos.motobitride.core.shizuku.ShizukuBridge
+import com.nos.motobitride.core.settings.AppSettings
 
 private const val TAG = "DisplaySetup"
 
@@ -53,9 +54,23 @@ object DisplaySetup {
         val pkg = context.packageName
         AppLog.i(TAG, "Preparazione MotoBit per il display (una volta sola)")
 
+        // Già pronti: da qui in poi Shizuku NON serve più (A4, F3).
+        // Questo controllo viene PRIMA dell'interruttore: se i permessi ci sono
+        // la preparazione è conclusa e Shizuku non va interrogato (A3 → i).
         if (isReady(context)) {
             AppLog.i(TAG, "Permessi display già presenti: nessun comando necessario")
             return true
+        }
+
+        // Interruttore "Usa Shizuku" OFF: se i permessi non ci sono non possiamo
+        // concederli, e NON dobbiamo toccare Shizuku. Si dichiara il perché.
+        if (!AppSettings.shizukuEnabled.value) {
+            AppLog.w(
+                TAG,
+                "Shizuku disattivato dall'utente: la preparazione una-tantum non è possibile " +
+                        "finché non viene riattivato (una volta sola, poi non serve più)"
+            )
+            return false
         }
 
         val gateway = ShizukuBridge.current

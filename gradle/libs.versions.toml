@@ -2,6 +2,7 @@
 agp = "8.12.3"
 coroutines = "1.9.0"
 shizuku = "13.1.5"
+hiddenapibypass = "6.1"
 barcodeScanning = "17.3.0"
 cameraCore = "1.5.2"
 kotlin = "2.0.21"
@@ -20,6 +21,7 @@ navVersion = "2.9.6"
 shizuku-api = { module = "dev.rikka.shizuku:api", version.ref = "shizuku" }
 shizuku-provider = { module = "dev.rikka.shizuku:provider", version.ref = "shizuku" }
 kotlinx-coroutines-android = { group = "org.jetbrains.kotlinx", name = "kotlinx-coroutines-android", version.ref = "coroutines" }
+hiddenapibypass = { module = "org.lsposed.hiddenapibypass:hiddenapibypass", version.ref = "hiddenapibypass" }
 androidx-camera-camera2 = { module = "androidx.camera:camera-camera2", version.ref = "cameraCore" }
 androidx-camera-core = { module = "androidx.camera:camera-core", version.ref = "cameraCore" }
 androidx-camera-lifecycle = { module = "androidx.camera:camera-lifecycle", version.ref = "cameraCore" }

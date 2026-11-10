@@ -4,6 +4,90 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🖥️ 2.6.0 — Display: motore riscritto, due modalità, oscuramento reale
+
+**Data**: 2026-11-10 · **versionCode**: 2600
+
+> Riscrittura dopo la prova sul dispositivo: la prima stesura di questa versione
+> (descritta più sotto, **superata**) aveva un ciclo applica/ripristina che rendeva
+> il telefono inutilizzabile. Qui c'è quello che è stato effettivamente testato.
+
+### Bug bloccanti trovati e corretti
+| Bug | Causa | Correzione |
+|---|---|---|
+| Telefono inutilizzabile: risoluzione cambia e torna, schermo nero intermittente | cambiare risoluzione/densità **ricreava l'Activity**, e in `onCreate` il ripristino automatico annullava l'applicazione | `android:configChanges` su `MainActivity` + sincronizzazione display **una sola volta per processo** |
+| "MotoBit non funziona con Shizuku disabilitato" | alla reflection passavo tipi **boxed** (`java.lang.Integer`): `getMethod` non trovava `setForcedDisplaySize(int,int,int)` → il percorso "permessi" falliva sempre | `javaPrimitiveType` + esenzioni hidden API `"L"` + `Process.myUid()/100000` (come Monitune) |
+| Oscuramento: sempre nero pieno | la luminosità del telefono vale **2912** su scala estesa; il codice la limitava a **255** → scriveva ~178 = nero | nessun clamp: `luminosità = base × valore / 100` |
+| Oscuramento lasciato appeso dopo un crash | la base era scritta ma il processo moriva prima del ripristino | base memorizzata + **guarigione all'avvio** |
+| Bolla fuori schermo dopo il ridimensionamento | `FLAG_LAYOUT_NO_LIMITS` + posizione in pixel vecchi | flag rimosso + clamp a ogni `onConfigurationChanged` e dopo ogni tocco |
+| TFT verticale letto come 800×384 orizzontale | si usava il **default del controller di streaming** come se fosse negoziato | `tftSize()` usa i valori negoziati **solo** se `isResolutionNegotiated`; altrimenti 592×752 |
+
+### Motore display (`:display`) — metodo allineato a RideLink
+- **`wm size W×H`** come operazione principale; **densità opzionale** (0 = non toccata)
+- **Verifica** dopo l'applicazione; se il display non prende la modifica → **rollback immediato**
+- **Ripristino = `wm size reset` + `wm density reset`**: non dipende da nessun valore salvato, funziona anche prima dello sblocco e a Shizuku spento
+- **Rotazione riapplicata dopo** il cambio di dimensione (cambiare size la resetta)
+- Modulo **decomplessato da `:shizuku`** (riflessione): togliendo `:shizuku` o `:display` la build resta verde (verificato)
+
+### Due modalità (mutuamente esclusive)
+| Modalità | Comportamento |
+|---|---|
+| **Telefono in tasca** | sensore di prossimità: coperto → oscura secondo la barra + risoluzione; scoperto → ripristino. Attivare la modalità **non** tocca il display |
+| **Telefono sul manubrio** | bolla flottante con stato (blu = attivo); un tocco applica risoluzione (+scuro se lo switch è on), secondo tocco ripristina. Bolla persistente e sempre dentro lo schermo |
+
+### Oscuramento
+- **Luminosità reale** dello schermo (nessun velo nero → i pixel trasmessi al TFT restano identici)
+- Barra **0–50%** dove il valore è **la luminosità**: 0 ≈ nero, 50 = metà
+- Overlay trasparente **solo** per `FLAG_KEEP_SCREEN_ON` (schermo mai spento mentre è scuro)
+- Fallback alla luminosità di finestra se `WRITE_SETTINGS` è negato
+
+### Ripristino (tre reti)
+1. **Tasto accensione** (broadcast, indipendente dallo stato dell'app)
+2. **Volume + e − insieme** (<200 ms)
+3. **Avvio dell'app** se trova un override attivo
+
+### Migrazione
+`prefs_version 1`: le preferenze display delle versioni precedenti (originali a 7 campi, modalità inventata, barra nascosta) vengono riportate ai valori sicuri.
+
+### Verificato sul dispositivo
+```
+Piano: 592x752 · densità 263dpi (360dp)   → 360 dp, indistinguibile da un telefono normale
+Display applicato (via permessi)          → senza Shizuku
+ScreenOffGuard: Schermo spento → ripristino totale del display
+```
+
+---
+
+## 🖥️ 2.6.0 (prima stesura — SUPERATA)
+
+**Data**: 2026-11-07 · **versionCode**: 2600
+
+### Modulo `:display` (motore)
+| | |
+|---|---|
+| Risoluzione/densità | prima via **permessi** (`IWindowManager` per riflessione + `HiddenApiBypass`), poi **shell** Shizuku |
+| Rotazione | `Settings.System` + `wm set-ignore-orientation-request` (best effort) |
+| Barra comandi | `Settings.Global.policy_control` immersive |
+| Oscuramento | luminosità proporzionale (base **originale**, mai sommata) |
+| `readOriginals` / `restoreAll` | fotografia + ripristino totale **idempotente**, luminosità per prima |
+| `lastVia` | dice se ha usato `permessi`, `shizuku` o `permessi (non applicato)` |
+
+Dipende da `:shizuku` solo per il fallback; l'app lo raggiunge per **riflessione**.
+
+### Pagina Risoluzione (definitiva)
+- **Scala del cruscotto** 100-190% sul formato negoziato dal TFT (592×752) → proporzioni sempre giuste
+- **Anteprima** `W × H` + densità calcolata (arrotondata a 16)
+- **Adatta densità** (switch), **Rotazione** Auto/Verticale/Orizzontale, **Nascondi barra comandi**
+- **Oscura schermo** con slider 10–50%
+- **Applica** · **Ripristina tutto** (sempre, anche due volte)
+- **Gating**: senza la preparazione la pagina mostra solo "Prima prepara MotoBit"
+
+### Sicurezza
+- **Tasto accensione** (schermo spento) → **ripristino totale automatico** (receiver registrato a runtime)
+- Gli originali si salvano **una volta sola** e non vengono mai sovrascritti
+
+---
+
 ## 🔑 2.5.2 — Fase 2a: preparazione una-tantum (il display non dipenderà più da Shizuku)
 
 **Data**: 2026-11-07 · **versionCode**: 2502

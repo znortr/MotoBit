@@ -23,6 +23,30 @@ enum class StartupBehavior(
     }
 }
 
+/**
+ * Le **due** modalità del display, mutuamente esclusive per costruzione (un solo
+ * valore salvato: sceglierne una disattiva l'altra).
+ * Il ripristino è affidato al **tasto accensione** (e ai due tasti volume).
+ */
+enum class DisplayMode {
+    /**
+     * **Telefono in tasca**: schermo spento dal sensore di prossimità
+     * (`PROXIMITY_SCREEN_OFF_WAKE_LOCK`) + risoluzione applicata.
+     */
+    POCKET,
+
+    /**
+     * **Sempre acceso**: si comanda con la sua **bolla**; la bolla cambia la
+     * risoluzione e, se lo switch "la bolla oscura" è attivo, oscura anche.
+     */
+    ALWAYS_ON;
+
+    companion object {
+        fun fromStored(value: String?): DisplayMode =
+            entries.firstOrNull { it.name == value } ?: ALWAYS_ON
+    }
+}
+
 object AppSettings {
     private const val TAG = "AppSettings"
     private const val FILE = "motobit_settings"
@@ -30,6 +54,28 @@ object AppSettings {
     private const val KEY_AUTO_CONNECT = "auto_connect"
     private const val KEY_SHOW_HOME_DIAGNOSTICS = "show_home_diagnostics"
     private const val KEY_SHIZUKU_ENABLED = "shizuku_enabled"
+    private const val KEY_DISPLAY_ORIGINALS = "display_originals"
+    private const val KEY_DISPLAY_SCALE = "display_scale_pct"
+    private const val KEY_DISPLAY_DENSITY = "display_density_scale"
+    private const val KEY_DISPLAY_ROTATION = "display_rotation"
+    private const val KEY_DISPLAY_NAVBAR = "display_hide_navbar"
+    private const val KEY_DISPLAY_DIM_ON = "display_dim_on"
+    private const val KEY_DISPLAY_DIM_PCT = "display_dim_pct"
+    private const val KEY_DISPLAY_OVERRIDE = "display_override"
+    private const val KEY_DISPLAY_MODE = "display_mode"
+    private const val KEY_DISPLAY_ORIG_DP = "display_orig_dp"
+    private const val KEY_DISPLAY_BUBBLE_DIM = "display_bubble_dim"
+
+    /**
+     * Versione delle preferenze del display.
+     *
+     * Serve a ripulire i valori lasciati dalle versioni precedenti, che erano
+     * inaffidabili (originali a 7 campi, modalità inventata, barra nascosta):
+     * con quelli il ripristino riscriveva valori sbagliati nelle impostazioni di
+     * sistema e il telefono restava con la barra nascosta o lampeggiava.
+     */
+    private const val KEY_PREFS_VERSION = "prefs_version"
+    private const val PREFS_VERSION = 1
     // Chiave nuova: "attesa attiva" in MINUTI. Le vecchie chiavi
     // (encoder_idle_timeout_min / _sec) restano ignorate di proposito.
     private const val KEY_ACTIVE_WAIT_MIN = "active_wait_min"
@@ -116,6 +162,71 @@ object AppSettings {
     private val _shizukuEnabled = MutableStateFlow(true)
     val shizukuEnabled: StateFlow<Boolean> = _shizukuEnabled.asStateFlow()
 
+    // ---------------- Display (pagina Risoluzione) ----------------
+
+    /** Originali (dimensioni|densità|luminosità|modo|accel|rotazione|barra). */
+    private val _displayOriginals = MutableStateFlow("")
+    val displayOriginals: StateFlow<String> = _displayOriginals.asStateFlow()
+
+    /** Percentuale del formato TFT (100 = 592x752). */
+    private val _displayScale = MutableStateFlow(100)
+    val displayScale: StateFlow<Int> = _displayScale.asStateFlow()
+
+    private val _displayDensityScale = MutableStateFlow(true)
+    val displayDensityScale: StateFlow<Boolean> = _displayDensityScale.asStateFlow()
+
+    /** auto | portrait | landscape */
+    /**
+     * Larghezza in dp del telefono **allo stato originale**.
+     *
+     * Si memorizza UNA volta, quando il display non è ancora modificato. Serve
+     * al calcolo della densità: leggere i dp del momento mentre il display è già
+     * alterato significherebbe compensare due volte (ed è così che si arriva a
+     * un'interfaccia inutilizzabile).
+     */
+    private val _displayOrigDp = MutableStateFlow(0)
+    val displayOrigDp: StateFlow<Int> = _displayOrigDp.asStateFlow()
+
+    /** Solo `portrait` o `landscape`: la rotazione automatica non ha senso qui. */
+    private val _displayRotation = MutableStateFlow("portrait")
+    val displayRotation: StateFlow<String> = _displayRotation.asStateFlow()
+
+    private val _displayHideNavBar = MutableStateFlow(false)
+    val displayHideNavBar: StateFlow<Boolean> = _displayHideNavBar.asStateFlow()
+
+    private val _displayDimOn = MutableStateFlow(false)
+    val displayDimOn: StateFlow<Boolean> = _displayDimOn.asStateFlow()
+
+    /** Oscuramento 0..50 % (0 = nessun buio). */
+    private val _displayDimPercent = MutableStateFlow(30)
+    val displayDimPercent: StateFlow<Int> = _displayDimPercent.asStateFlow()
+
+    /** Vero se il display è attualmente modificato da noi. */
+    private val _displayOverride = MutableStateFlow(false)
+    val displayOverride: StateFlow<Boolean> = _displayOverride.asStateFlow()
+
+    /**
+     * Modalità attiva sul display, **mutuamente esclusive**:
+     *  - [DisplayMode.POCKET] telefono in tasca (schermo spento dal sensore);
+     *  - [DisplayMode.ALWAYS_ON] sempre acceso: comanda la bolla, che può
+     *    oscurare se lo switch "la bolla oscura" è attivo.
+     */
+    private val _displayMode = MutableStateFlow(DisplayMode.ALWAYS_ON)
+    val displayMode: StateFlow<DisplayMode> = _displayMode.asStateFlow()
+
+    /**
+     * Se attivo, toccare la bolla oscura **oltre** a cambiare risoluzione.
+     * Default ON: è il comportamento richiesto (bolla = risoluzione + scuro).
+     */
+    private val _displayBubbleDim = MutableStateFlow(true)
+    val displayBubbleDim: StateFlow<Boolean> = _displayBubbleDim.asStateFlow()
+
+    fun setDisplayBubbleDim(enabled: Boolean) {
+        _displayBubbleDim.value = enabled
+        prefs?.edit()?.putBoolean(KEY_DISPLAY_BUBBLE_DIM, enabled)?.apply()
+        AppLog.i(TAG, "La bolla oscura -> ${if (enabled) "ON" else "OFF"}")
+    }
+
     private val _language = MutableStateFlow(AppLanguage.ITALIANO)
     val language: StateFlow<AppLanguage> = _language.asStateFlow()
 
@@ -144,11 +255,25 @@ object AppSettings {
         if (prefs != null) return
         val p = context.applicationContext.getSharedPreferences(FILE, Context.MODE_PRIVATE)
         prefs = p
+        migrateDisplayPrefs(p)
         _startup.value = StartupBehavior.fromStored(p.getString(KEY_STARTUP, null))
         // Migrazione dal vecchio comportamento a 3 voci:
         // AUTO_LINK / AUTO_LINK_AND_STREAM -> automatico, MANUAL -> manuale.
         _showHomeDiagnostics.value = p.getBoolean(KEY_SHOW_HOME_DIAGNOSTICS, false)
         _shizukuEnabled.value = p.getBoolean(KEY_SHIZUKU_ENABLED, true)
+        _displayOriginals.value = p.getString(KEY_DISPLAY_ORIGINALS, "").orEmpty()
+        _displayScale.value = p.getInt(KEY_DISPLAY_SCALE, 100)
+        _displayDensityScale.value = p.getBoolean(KEY_DISPLAY_DENSITY, true)
+        _displayRotation.value = p.getString(KEY_DISPLAY_ROTATION, "portrait").orEmpty()
+        _displayHideNavBar.value = p.getBoolean(KEY_DISPLAY_NAVBAR, false)
+        _displayDimOn.value = p.getBoolean(KEY_DISPLAY_DIM_ON, false)
+        _displayDimPercent.value = p.getInt(KEY_DISPLAY_DIM_PCT, 30)
+        _displayOverride.value = p.getBoolean(KEY_DISPLAY_OVERRIDE, false)
+        _displayMode.value = DisplayMode.fromStored(p.getString(KEY_DISPLAY_MODE, null))
+        _displayOrigDp.value = p.getInt(KEY_DISPLAY_ORIG_DP, 0)
+        _displayBubbleDim.value = p.getBoolean(KEY_DISPLAY_BUBBLE_DIM, true)
+        // La modalità "auto" non esiste più: solo verticale o orizzontale.
+        if (_displayRotation.value == "auto") _displayRotation.value = "portrait"
         _autoConnect.value = if (p.contains(KEY_AUTO_CONNECT)) {
             p.getBoolean(KEY_AUTO_CONNECT, false)
         } else {
@@ -196,6 +321,36 @@ object AppSettings {
         AppLog.i(TAG, "Push orologio all'avvio: ${_clockPushCount.value}")
         AppLog.i(TAG, "Keepalive orologio periodico (5 min): ${if (_periodicClockKeepalive.value) "ON" else "OFF"}")
         AppLog.i(TAG, "Log diagnostica: ${if (diagEnabled) "ON" else "OFF"}")
+    }
+
+    /**
+     * Riporta ai valori sicuri le preferenze display delle versioni precedenti.
+     * Una volta sola per installazione (poi `prefs_version` resta aggiornata).
+     */
+    private fun migrateDisplayPrefs(p: SharedPreferences) {
+        val version = p.getInt(KEY_PREFS_VERSION, 0)
+        if (version >= PREFS_VERSION) return
+
+        p.edit()
+            // Gli originali vecchi avevano 7 campi: il nuovo ripristino li
+            // leggeva male (policy_control = "0", rotazione = densità).
+            .remove(KEY_DISPLAY_ORIGINALS)
+            .remove(KEY_DISPLAY_OVERRIDE)
+            .remove(KEY_DISPLAY_ORIG_DP)
+            .putString(KEY_DISPLAY_MODE, DisplayMode.ALWAYS_ON.name)
+            .putString(KEY_DISPLAY_ROTATION, "portrait")
+            .putBoolean(KEY_DISPLAY_NAVBAR, false)
+            .putBoolean(KEY_DISPLAY_DENSITY, true)
+            .putInt(KEY_DISPLAY_SCALE, 100)
+            .putInt(KEY_DISPLAY_DIM_PCT, 30)
+            .putInt(KEY_PREFS_VERSION, PREFS_VERSION)
+            .apply()
+
+        AppLog.w(
+            TAG,
+            "Migrazione preferenze display (era v$version): modalità manuale, " +
+                    "barra visibile, 100%, densità attiva, originali da rileggere"
+        )
     }
 
     fun setLanguage(lang: AppLanguage) {
@@ -258,6 +413,65 @@ object AppSettings {
         _shizukuEnabled.value = enabled
         prefs?.edit()?.putBoolean(KEY_SHIZUKU_ENABLED, enabled)?.apply()
         AppLog.i(TAG, "Shizuku -> ${if (enabled) "ON" else "OFF"}")
+    }
+
+    // ---------------- Display ----------------
+
+    fun setDisplayOriginals(value: String) {
+        _displayOriginals.value = value
+        prefs?.edit()?.putString(KEY_DISPLAY_ORIGINALS, value)?.apply()
+    }
+
+    fun setDisplayScale(pct: Int) {
+        val clamped = pct.coerceIn(100, 200)
+        _displayScale.value = clamped
+        prefs?.edit()?.putInt(KEY_DISPLAY_SCALE, clamped)?.apply()
+    }
+
+    fun setDisplayOrigDp(dp: Int) {
+        if (dp <= 0 || _displayOrigDp.value == dp) return
+        _displayOrigDp.value = dp
+        prefs?.edit()?.putInt(KEY_DISPLAY_ORIG_DP, dp)?.apply()
+        AppLog.i(TAG, "Larghezza originale del telefono: ${dp}dp")
+    }
+
+    fun setDisplayDensityScale(enabled: Boolean) {
+        _displayDensityScale.value = enabled
+        prefs?.edit()?.putBoolean(KEY_DISPLAY_DENSITY, enabled)?.apply()
+    }
+
+    fun setDisplayRotation(mode: String) {
+        val value = if (mode == "landscape") "landscape" else "portrait"
+        _displayRotation.value = value
+        prefs?.edit()?.putString(KEY_DISPLAY_ROTATION, value)?.apply()
+    }
+
+    fun setDisplayHideNavBar(enabled: Boolean) {
+        _displayHideNavBar.value = enabled
+        prefs?.edit()?.putBoolean(KEY_DISPLAY_NAVBAR, enabled)?.apply()
+    }
+
+    fun setDisplayDimOn(enabled: Boolean) {
+        _displayDimOn.value = enabled
+        prefs?.edit()?.putBoolean(KEY_DISPLAY_DIM_ON, enabled)?.apply()
+    }
+
+    /** Oscuramento: 0 = spento (luminosità originale), 1..50 = percentuale di buio. */
+    fun setDisplayDimPercent(pct: Int) {
+        val clamped = pct.coerceIn(0, 50)
+        _displayDimPercent.value = clamped
+        prefs?.edit()?.putInt(KEY_DISPLAY_DIM_PCT, clamped)?.apply()
+    }
+
+    fun setDisplayOverride(active: Boolean) {
+        _displayOverride.value = active
+        prefs?.edit()?.putBoolean(KEY_DISPLAY_OVERRIDE, active)?.apply()
+    }
+
+    fun setDisplayMode(mode: DisplayMode) {
+        _displayMode.value = mode
+        prefs?.edit()?.putString(KEY_DISPLAY_MODE, mode.name)?.apply()
+        AppLog.i(TAG, "Modalità display -> ${mode.name}")
     }
 
     /** Numero di push (a 250ms) della raffica iniziale dell'ora al TFT. */

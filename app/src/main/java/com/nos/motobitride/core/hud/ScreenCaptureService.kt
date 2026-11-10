@@ -16,6 +16,8 @@ import android.os.IBinder
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import com.nos.motobitride.R
+import com.nos.motobitride.core.display.DisplayModeController
+import com.nos.motobitride.core.display.ScreenOffRestoreGuard
 import com.nos.motobitride.core.log.AppLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -69,6 +71,14 @@ class ScreenCaptureService : Service() {
         // Da qui il servizio e' vivo: `updateStatus` puo' aggiornare la notifica.
         running = true
 
+        // Finche' il servizio vive, il tasto accensione ripristina il display
+        // anche con l'app chiusa (la guardia in MainActivity morirebbe con lei).
+        ScreenOffRestoreGuard.register(this)
+
+        // La sessione in moto deve funzionare anche con l'Activity chiusa:
+        // sensore/bolla vanno allineati qui, non solo in MainActivity.
+        runCatching { DisplayModeController.apply(this) }
+
         val resultCode = intent?.getIntExtra(EXTRA_RESULT_CODE, Activity.RESULT_CANCELED)
             ?: Activity.RESULT_CANCELED
 
@@ -118,6 +128,7 @@ class ScreenCaptureService : Service() {
     override fun onDestroy() {
         super.onDestroy()
         running = false
+        runCatching { ScreenOffRestoreGuard.unregister(this) }
         // Sicurezza: nessuna notifica deve sopravvivere al servizio.
         runCatching {
             NotificationManagerCompat.from(this).cancel(NOTIFICATION_ID)

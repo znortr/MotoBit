@@ -46,6 +46,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -64,6 +65,7 @@ import com.nos.motobitride.core.hud.StreamState
 import com.nos.motobitride.core.apps.AppInfo
 import com.nos.motobitride.core.apps.InstalledApps
 import com.nos.motobitride.core.apps.SavedApps
+import com.nos.motobitride.core.display.DisplayMaster
 import com.nos.motobitride.core.garage.VehicleStore
 import com.nos.motobitride.core.garage.vehicleDisplayName
 import com.nos.motobitride.feature.home.AppGrid
@@ -84,6 +86,7 @@ import com.nos.motobitride.ui.shizuku.performAction
 import com.nos.motobitride.ui.shizuku.rememberShizukuStatus
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 private const val TAG_UI = "HudScreen"
@@ -106,6 +109,7 @@ fun HudScreen(
     onNavigateSettings: () -> Unit = {}
 ) {
     val ctx = LocalContext.current
+    val scope = rememberCoroutineScope()
     val isPreview = LocalInspectionMode.current
 
     // La sessione vive nel processo (HudSession), non nel Composable: cosi'
@@ -587,14 +591,25 @@ fun HudScreen(
                 OutlinedButton(
                     onClick = {
                         AppLog.i(TAG_UI, "Chiudi premuto")
-                        // Prima si ferma il servizio (rimuove la notifica e chiude
-                        // la MediaProjection), poi sessione e link: cosi'
-                        // `closeAll()` non prova ad aggiornare una notifica che
-                        // non esiste piu'.
-                        ScreenCaptureService.stopService(ctx)
-                        StartBubbleService.hide(ctx)
-                        HudSession.closeAll()
-                        ctx.getActivity()?.finishAndRemoveTask()
+                        scope.launch {
+                            // PRIMA si rimette il display a posto: dopo
+                            // `finishAndRemoveTask()` il processo può morire e il
+                            // ripristino non avverrebbe più, lasciando il
+                            // telefono oscurato e con la risoluzione ridotta.
+                            if (AppSettings.displayOverride.value) {
+                                withContext(Dispatchers.IO) {
+                                    runCatching { DisplayMaster.restoreAll(ctx) }
+                                }
+                            }
+                            // Poi si ferma il servizio (rimuove la notifica e
+                            // chiude la MediaProjection), quindi sessione e link:
+                            // cosi' `closeAll()` non prova ad aggiornare una
+                            // notifica che non esiste piu'.
+                            ScreenCaptureService.stopService(ctx)
+                            StartBubbleService.hide(ctx)
+                            HudSession.closeAll()
+                            ctx.getActivity()?.finishAndRemoveTask()
+                        }
                     }
                 ) {
                     Text(AppTexts.get("common_close", currentLang))

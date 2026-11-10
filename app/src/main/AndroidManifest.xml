@@ -93,9 +93,39 @@
             android:taskAffinity=".stream"
             android:theme="@style/Theme.MotobitRide.Translucent" />
 
+        <!--
+            SICUREZZA (punto 2): ripristino del display al riavvio, PRIMA dello
+            sblocco. directBootAware = parte anche se i dati utente sono ancora
+            cifrati; gli originali stanno nella memoria non cifrata.
+        -->
+        <receiver
+            android:name=".core.display.BootRestoreReceiver"
+            android:directBootAware="true"
+            android:enabled="true"
+            android:exported="false">
+            <intent-filter>
+                <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED"/>
+                <action android:name="android.intent.action.BOOT_COMPLETED"/>
+            </intent-filter>
+        </receiver>
+
         <!-- Pulsante flottante "AVVIA" quando il TFT non e' connesso -->
         <service
             android:name=".feature.stream.StartBubbleService"
+            android:enabled="true"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="overlay_bubble" />
+        </service>
+
+        <!--
+            Bolla della modalità "Sempre acceso": bolla SEPARATA da quella AVVIA.
+            Resta visibile e riguarda solo il display (risoluzione senza scuro).
+        -->
+        <service
+            android:name=".core.display.AlwaysOnBubbleService"
             android:enabled="true"
             android:exported="false"
             android:foregroundServiceType="specialUse">
@@ -132,8 +162,17 @@
             </intent-filter>
         </receiver>
 
+        <!--
+            ATTENZIONE — configChanges OBBLIGATORIO.
+            Cambiare risoluzione o densità è una configurazione del display:
+            SENZA queste voci l'Activity viene RICREATA a ogni modifica, e alla
+            ricreazione il ripristino automatico annullava quello che si era
+            appena applicato → ciclo applica/ripristina, schermo nero a
+            intermittenza, telefono inutilizzabile.
+        -->
         <activity
             android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|density|uiMode|keyboardHidden|navigation|fontScale"
             android:exported="true"
             android:theme="@style/Theme.MotobitRide">
             <intent-filter>

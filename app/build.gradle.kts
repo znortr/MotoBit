@@ -52,6 +52,11 @@ dependencies {
     // L'app compila lo stesso: usa il gateway vuoto.
     implementation(project(":shizuku"))
 
+    // Motore display (risoluzione/rotazione/barra/luminosità). Raggiunto per
+    // riflessione: commentando questa riga + include(":display"), la pagina
+    // Risoluzione si disattiva da sola.
+    implementation(project(":display"))
+
     // Camera X
     implementation(libs.androidx.camera.core)
     implementation(libs.androidx.camera.camera2)
