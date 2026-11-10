@@ -4,6 +4,40 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🔑 2.5.2 — Fase 2a: preparazione una-tantum (il display non dipenderà più da Shizuku)
+
+**Data**: 2026-11-07 · **versionCode**: 2502
+
+### Il cambio di approccio
+Shizuku serve **una volta sola**, per concedere a MotoBit due permessi speciali che
+Android non dà dalle impostazioni. Da quel momento il display si cambia e si
+**ripristina sempre**, anche a Shizuku spento.
+
+```
+pm grant <pkg> android.permission.WRITE_SECURE_SETTINGS
+appops set <pkg> WRITE_SETTINGS allow
+```
+
+I permessi **sopravvivono al riavvio**. Shizuku resta installato come **backup**
+(per riconcederli se servissero).
+
+### Cosa è stato aggiunto
+| Pezzo | Dettaglio |
+|---|---|
+| `DisplaySetup` (core) | esegue i due comandi via Shizuku, poi **verifica** i permessi |
+| Manifest | dichiarati `WRITE_SETTINGS` e `WRITE_SECURE_SETTINGS` |
+| **Permessi** | nuova riga **"Prepara MotoBit (una volta sola)"** con stato e pulsante; se Shizuku non è pronto il pulsante porta ad attivarlo; i comandi girano **fuori dal thread grafico** |
+| **Guida** | nuovo **passo 8 — "Prepara MotoBit"** + sezione **"Come si usa la risoluzione"** in parole semplici |
+| Nota in guida | aggiornata: *dopo la preparazione Shizuku non serve più* |
+
+### Sicurezza (impianto definitivo)
+- **Tasto accensione** (spegni/riaccendi lo schermo) → **ripristino totale**
+- Ripristino sempre possibile grazie ai permessi ottenuti
+- Countdown 15 s **eliminato** (non serve)
+- Watchdog in processo separato e `BootReceiver` restano in fase 2d
+
+---
+
 ## 📖 2.5.1 — Guida passo-passo Shizuku + testi in Home
 
 **Data**: 2026-11-07 · **versionCode**: 2501

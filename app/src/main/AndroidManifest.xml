@@ -50,6 +50,15 @@
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW"/>
 
     <!--
+        Permessi per cambiare/ripristinare il display senza Shizuku.
+        Non si ottengono dalle impostazioni di Android: li concede l'app stessa
+        UNA VOLTA via Shizuku ("Prepara MotoBit"). Sopravvivono al riavvio:
+        dopo la preparazione Shizuku resta solo come backup.
+    -->
+    <uses-permission android:name="android.permission.WRITE_SETTINGS"/>
+    <uses-permission android:name="android.permission.WRITE_SECURE_SETTINGS"/>
+
+    <!--
         Visibilita' delle app installate (Android 11+): senza queste queries
         queryIntentActivities restituirebbe solo pochissime app.
     -->

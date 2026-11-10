@@ -19,12 +19,14 @@ import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.unit.dp
+import com.nos.motobitride.core.display.DisplaySetup
 import com.nos.motobitride.core.settings.AppSettings
 import com.nos.motobitride.core.settings.BatteryOptimization
 import com.nos.motobitride.core.settings.PermissionsHelper
@@ -34,6 +36,9 @@ import com.nos.motobitride.ui.shizuku.actionKey
 import com.nos.motobitride.ui.shizuku.labelKey
 import com.nos.motobitride.ui.shizuku.performAction
 import com.nos.motobitride.ui.shizuku.rememberShizukuStatus
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.launch
+import kotlinx.coroutines.withContext
 import kotlinx.coroutines.delay
 
 /**
@@ -96,6 +101,11 @@ private fun PermissionsContent(
     // Shizuku (opzionale): stato osservato solo se l'interruttore generale è ON.
     val shizukuEnabled by AppSettings.shizukuEnabled.collectAsState()
     val shizukuStatus = rememberShizukuStatus(shizukuEnabled)
+
+    // Preparazione una-tantum per il display (concede i 2 permessi via Shizuku).
+    val scope = rememberCoroutineScope()
+    var displayReady by remember { mutableStateOf(DisplaySetup.isReady(ctx)) }
+    var displayBusy by remember { mutableStateOf(false) }
 
     val runtimeLauncher = rememberLauncherForActivityResult(
         contract = ActivityResultContracts.RequestMultiplePermissions()
@@ -212,13 +222,46 @@ private fun PermissionsContent(
 
     HorizontalDivider()
 
-    // Shizuku: opzionale. Serve alla sola pagina Risoluzione (fase 2).
+    // Shizuku: serve alla preparazione e come backup.
     PermissionRow(
         title = AppTexts.get("shizuku_section_title", currentLang),
         desc = AppTexts.get(shizukuStatus.labelKey(), currentLang),
         ok = shizukuStatus.isReady,
         actionLabel = shizukuStatus.actionKey()?.let { AppTexts.get(it, currentLang) },
         onAction = { shizukuStatus.performAction() }
+    )
+
+    HorizontalDivider()
+
+    // Preparazione una-tantum: da qui in poi Shizuku non serve più.
+    PermissionRow(
+        title = AppTexts.get("setup_title", currentLang),
+        desc = AppTexts.get(
+            if (displayReady) "setup_ready" else "setup_needed",
+            currentLang
+        ),
+        ok = displayReady,
+        actionLabel = when {
+            displayReady -> null
+            displayBusy -> AppTexts.get("setup_working", currentLang)
+            !shizukuStatus.isReady -> AppTexts.get("setup_need_shizuku", currentLang)
+            else -> AppTexts.get("setup_action", currentLang)
+        },
+        onAction = {
+            when {
+                displayReady || displayBusy -> Unit
+                !shizukuStatus.isReady -> shizukuStatus.performAction()
+                else -> {
+                    displayBusy = true
+                    scope.launch {
+                        // I comandi girano fuori dal thread grafico.
+                        val ok = withContext(Dispatchers.IO) { DisplaySetup.run(ctx) }
+                        displayReady = ok
+                        displayBusy = false
+                    }
+                }
+            }
+        }
     )
 }
 
