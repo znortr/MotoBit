@@ -63,7 +63,6 @@ fun SettingsShizukuGuideScreen(
         Hint(AppTexts.get("guide_step5_title", currentLang), AppTexts.get("guide_step5_desc", currentLang), 5)
         Hint(AppTexts.get("guide_step6_title", currentLang), AppTexts.get("guide_step6_desc", currentLang), 6)
         Hint(AppTexts.get("guide_step7_title", currentLang), AppTexts.get("guide_step7_desc", currentLang), 7)
-        Hint(AppTexts.get("guide_step8_title", currentLang), AppTexts.get("guide_step8_desc", currentLang), 8)
 
         HorizontalDivider()
 
@@ -77,7 +76,6 @@ fun SettingsShizukuGuideScreen(
             Bullet(AppTexts.get("guide_res_2", currentLang))
             Bullet(AppTexts.get("guide_res_3", currentLang))
             Bullet(AppTexts.get("guide_res_4", currentLang))
-            Bullet(AppTexts.get("guide_res_5", currentLang))
         }
 
         HorizontalDivider()
