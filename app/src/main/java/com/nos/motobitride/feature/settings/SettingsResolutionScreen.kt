@@ -33,7 +33,8 @@ import com.nos.motobitride.ui.shizuku.rememberShizukuStatus
  */
 @Composable
 fun SettingsResolutionScreen(
-    onBack: () -> Unit = {}
+    onBack: () -> Unit = {},
+    onOpenShizukuGuide: () -> Unit = {}
 ) {
     val currentLang by AppSettings.language.collectAsState()
     val shizukuEnabled by AppSettings.shizukuEnabled.collectAsState()
@@ -91,6 +92,14 @@ fun SettingsResolutionScreen(
                     Text(AppTexts.get(key, currentLang))
                 }
             }
+        }
+
+        // Guida passo-passo: serve al primo avvio e quando qualcosa si blocca.
+        TextButton(
+            onClick = onOpenShizukuGuide,
+            modifier = Modifier.fillMaxWidth()
+        ) {
+            Text(AppTexts.get("guide_link", currentLang))
         }
 
         HorizontalDivider()

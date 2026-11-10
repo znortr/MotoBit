@@ -4,6 +4,37 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 📖 2.5.1 — Guida passo-passo Shizuku + testi in Home
+
+**Data**: 2026-11-07 · **versionCode**: 2501
+
+### Guida (nuova pagina)
+`SettingsShizukuGuideScreen` + rotta `settings_shizuku_guide`, raggiungibile
+dalla pagina Risoluzione (**Guida passo passo**).
+
+Linguaggio volutamente semplice, senza termini tecnici, con numeri grandi:
+
+| # | Passo |
+|---|---|
+| 1 | Installa Shizuku |
+| 2 | Attiva le opzioni sviluppatore |
+| 3 | Accendi il debug wireless |
+| 4 | Accoppia il telefono (codice a 6 numeri dalla notifica) |
+| 5 | Avvia Shizuku |
+| 6 | Autorizza MotoBit |
+| 7 | Controlla che sia tutto pronto |
+
+In evidenza in cima: **al riavvio del telefono Shizuku si ferma**.
+In fondo, sezione **Se qualcosa non funziona**: Wi-Fi spento/cambiato, riavvio,
+non autorizzato, notifica col codice che non arriva.
+
+### Home
+Il testo dell'avviso ora dice cosa fare davvero:
+- Shizuku **non installato** → **Installa Shizuku**
+- Shizuku **non attivo / non autorizzato** → **Attiva Shizuku**
+
+---
+
 ## 🧩 2.5.0 — Fase 1: fondamenta Shizuku (nessun cambio al video)
 
 **Data**: 2026-11-07 · **versionCode**: 2500

@@ -19,6 +19,7 @@ import com.nos.motobitride.feature.settings.SettingsGeneralScreen
 import com.nos.motobitride.feature.settings.SettingsPermissionsScreen
 import com.nos.motobitride.feature.settings.SettingsResolutionScreen
 import com.nos.motobitride.feature.settings.SettingsScreen
+import com.nos.motobitride.feature.settings.SettingsShizukuGuideScreen
 
 @Composable
 fun AppNavGraph(
@@ -139,7 +140,16 @@ fun AppNavGraph(
 
         composable(AppDestination.SettingsResolution.route) {
             SettingsResolutionScreen(
-                onBack = { goBackFrom(AppDestination.SettingsResolution.route) }
+                onBack = { goBackFrom(AppDestination.SettingsResolution.route) },
+                onOpenShizukuGuide = {
+                    navController.navigate(AppDestination.SettingsShizukuGuide.route)
+                }
+            )
+        }
+
+        composable(AppDestination.SettingsShizukuGuide.route) {
+            SettingsShizukuGuideScreen(
+                onBack = { goBackFrom(AppDestination.SettingsShizukuGuide.route) }
             )
         }
 

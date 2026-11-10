@@ -548,7 +548,18 @@ fun HudScreen(
                     onClick = { shizukuStatus.performAction() },
                     modifier = Modifier.fillMaxWidth()
                 ) {
-                    Text(AppTexts.get("shizuku_home_hint", currentLang))
+                    // Testo diverso a seconda di cosa manca davvero:
+                    // se non è installato → "Installa", altrimenti → "Attiva".
+                    Text(
+                        AppTexts.get(
+                            if (shizukuStatus == com.nos.motobitride.core.shizuku.ShizukuStatus.NOT_INSTALLED) {
+                                "shizuku_home_install"
+                            } else {
+                                "shizuku_home_activate"
+                            },
+                            currentLang
+                        )
+                    )
                 }
             }
 
