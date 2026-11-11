@@ -382,13 +382,14 @@ fun SettingsResolutionScreen(
         HorizontalDivider()
 
         // ---------------- Azioni ----------------
-        Button(
-            onClick = { act { DisplayMaster.applyAll(ctx) } },
-            enabled = canAct,
-            modifier = Modifier.fillMaxWidth()
-        ) {
-            Text(AppTexts.get(if (busy) "setup_working" else "res_apply", currentLang))
-        }
+        // Niente pulsante «Applica»: la risoluzione si applica **con la bolla**
+        // (modalità manubrio) o **coprendo il sensore** (modalità tasca).
+        // Qui si sceglie solo *come* deve diventare.
+        Text(
+            AppTexts.get("res_apply_hint", currentLang),
+            style = MaterialTheme.typography.bodySmall,
+            color = MaterialTheme.colorScheme.onSurfaceVariant
+        )
 
         OutlinedButton(
             onClick = { act { DisplayMaster.restoreAll(ctx) } },

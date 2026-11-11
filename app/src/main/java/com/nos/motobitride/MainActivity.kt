@@ -85,9 +85,60 @@ class MainActivity : ComponentActivity() {
      */
     override fun onResume() {
         super.onResume()
+        // Barra comandi: va nascosta **dentro la nostra finestra**. `policy_control`
+        // da solo non toglie lo spazio dei gesti, che l'app continua a riservare
+        // e che nel video (senza trasparenza) diventa una banda nera opaca.
+        applyNavBarVisibility()
         Thread {
             runCatching { DisplayModeController.apply(applicationContext) }
         }.start()
+
+        // Secondo tentativo ritardato: al primo avvio l'app non è ancora
+        // considerata in primo piano e ColorOS rifiuta l'avvio del servizio
+        // della bolla → la bolla apparirebbe solo dopo un tocco o un cambio
+        // schermata. Riprovare dopo un istante la fa comparire subito.
+        android.os.Handler(mainLooper).postDelayed({
+            runCatching { DisplayModeController.apply(applicationContext) }
+        }, 1500)
+    }
+
+    /**
+     * Barra dei **comandi** (non quella di stato: batteria e ora restano).
+     *
+     * Regola: nascosta **solo** se lo switch è ON **e** il display è modificato.
+     * A risoluzione normale deve restare visibile, altrimenti il telefono non si
+     * usa più normalmente.
+     */
+    private fun applyNavBarVisibility() {
+        val hide = runCatching {
+            AppSettings.displayHideNavBar.value && AppSettings.displayOverride.value
+        }.getOrDefault(false)
+        runCatching {
+            // Modalità immersiva "vera": il contenuto occupa anche lo spazio
+            // della barra. Senza questo la finestra RISERVA la fascia in fondo
+            // e la disegna col proprio sfondo → resta una banda scura senza
+            // pulsanti (era esattamente il difetto segnalato).
+            androidx.core.view.WindowCompat
+                .setDecorFitsSystemWindows(window, !hide)
+
+            val controller = androidx.core.view.WindowCompat
+                .getInsetsController(window, window.decorView)
+            if (hide) {
+                controller.hide(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+                controller.systemBarsBehavior =
+                    androidx.core.view.WindowInsetsControllerCompat
+                        .BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
+            } else {
+                controller.show(androidx.core.view.WindowInsetsCompat.Type.navigationBars())
+            }
+            AppLog.i("MainActivity", "Barra comandi: ${if (hide) "nascosta" else "visibile"}")
+        }
+    }
+
+    /** Il cambio di risoluzione ricrea la configurazione: la barra torna. */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        applyNavBarVisibility()
     }
 
     override fun onDestroy() {

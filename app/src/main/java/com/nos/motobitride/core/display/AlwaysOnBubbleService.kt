@@ -203,11 +203,23 @@ class AlwaysOnBubbleService : Service() {
         }
     }
 
-    /** Blu = display modificato (risoluzione attiva), grigio = normale. */
+    /**
+     * Stato visibile a colpo d'occhio:
+     *  - **giallo** = display modificato E schermo oscurato (massima visibilità,
+     *    perché lo schermo è scuro e la bolla deve saltare all'occhio);
+     *  - **blu** = display modificato ma non oscurato;
+     *  - **grigio** = display normale.
+     */
     private fun updateLook() {
         val active = runCatching { AppSettings.displayOverride.value }.getOrDefault(false)
+        val dimmed = active && runCatching { DimOverlay.isVisible }.getOrDefault(false)
+        val color = when {
+            dimmed -> "#FFC107"   // giallo
+            active -> "#1E88E5"   // blu
+            else -> "#546E7A"     // grigio
+        }
         val bg = runCatching { bubble?.background as? GradientDrawable }.getOrNull()
-        bg?.setColor(Color.parseColor(if (active) "#1E88E5" else "#546E7A"))
+        bg?.setColor(Color.parseColor(color))
     }
 
 

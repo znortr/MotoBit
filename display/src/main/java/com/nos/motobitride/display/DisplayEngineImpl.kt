@@ -225,12 +225,18 @@ class DisplayEngineImpl(context: Context) {
         return true
     }
 
-    /** Nasconde barra di stato e di navigazione (immersive) in tutte le app. */
+    /**
+     * Nasconde **solo la barra dei comandi** (non quella di stato: batteria e
+     * ora non danno fastidio e non vanno toccate).
+     *
+     * `immersive.navigation=*` vale per **tutte le app**, quindi la barra resta
+     * nascosta anche aprendo il navigatore durante il mirroring.
+     */
     fun setNavBar(hidden: Boolean): Boolean = runCatching {
         Settings.Global.putString(
             cr(),
             "policy_control",
-            if (hidden) "immersive.full=*" else null
+            if (hidden) "immersive.navigation=*" else null
         )
         true
     }.getOrDefault(false)

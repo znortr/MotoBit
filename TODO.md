@@ -3,7 +3,7 @@
 Idee e lavori **da fare**, in ordine di priorità. Nessuna di queste voci è implementata:
 qui si annotano solo requisiti, note tecniche e decisioni ancora aperte.
 
-Ultimo aggiornamento: 2026-11-06 · versione corrente: **1.2.8 (1208)**
+Ultimo aggiornamento: 2026-11-10 · versione corrente: **2.6.0 (2600)**
 
 ---
 
@@ -482,6 +482,48 @@ sprecare il tentativo (e non toccare la macchina a stati).
 caso "TFT appena accesso e visibile" dovrebbe partire subito.
 - [ ] Se il TFT impiega 20-30 s ad accendersi, la lentezza è **del TFT**: da
 verificare con un cronometro, per non correggere l'app per un problema hardware.
+
+---
+
+## 15. TFT orizzontale — orientamento dedotto dal TFT — **DECISO: A, DA IMPLEMENTARE**
+
+**Stato**: oggi il calcolo funziona **solo con TFT verticale**. Con un TFT orizzontale
+(es. **Voge 900**, 800×384) le misure sarebbero giuste ma verrebbero applicate
+nell'orientamento sbagliato.
+
+**Decisione presa**: **A** — l'orientamento lo decide **il TFT** (`w > h` nei valori
+negoziati). Lo switch Verticale/Orizzontale resta solo come **forzatura manuale**
+per i casi strani.
+
+### Perché non basta usare le misure del TFT
+
+`wm size` si esprime **sempre nell'orientamento naturale del pannello** (verticale
+sul telefono). Scrivendo `800 384` su un pannello verticale si ottiene:
+
+| Effetto | Perché |
+|---|---|
+| immagine **ruotata di 90°** sul TFT | il display resta in orientamento verticale: il contenuto viene disegnato "in piedi" dentro un formato orizzontale |
+| interfaccia **inutilizzabile** sul telefono | 800×384 a densità adattata = **360×173 dp** → 173 dp di altezza |
+| ritorno della "striscia larga e bassa" | è lo stesso difetto già visto sul verticale, con i numeri invertiti |
+
+### Cosa serve (4 punti)
+
+- [ ] **1.** Dedurre l'orientamento del TFT da `negotiatedWidth`/`negotiatedHeight`:
+      `w > h` → orizzontale. Nessun dato nuovo dal protocollo.
+- [ ] **2.** Ricavare l'orientamento **naturale del pannello** con
+      `Display.getRealSize()` + `getRotation()` (così funziona anche su una head unit
+      nativamente orizzontale).
+- [ ] **3.** Scrivere `wm size` **nell'orientamento naturale**: TFT 800×384 su telefono
+      verticale → `wm size 384 800`.
+- [ ] **4.** Ruotare di conseguenza, riapplicando la rotazione **dopo** il cambio di
+      dimensione (cambiare size la resetta).
+
+**Risultato atteso**: display logico 800×384 **in orizzontale** → il TFT riceve 1:1 e
+il telefono mostra lo schermo intero nello stesso rapporto.
+
+**Dove intervenire**: `DisplayGeometry.targetSize()` (mappatura orientamento),
+`DisplayMaster.plan()` (orientamento dentro il piano), `DisplayEngineImpl.apply()`
+(ordine obbligato: size → rotazione).
 
 ---
 

@@ -124,6 +124,26 @@ class StartBubbleService : Service() {
         super.onTaskRemoved(rootIntent)
     }
 
+    /**
+     * La bolla AVVIA deve **rientrare** quando lo schermo si rimpicciolisce:
+     * senza questo, dopo il cambio di risoluzione resta fuori e non si vede più.
+     */
+    override fun onConfigurationChanged(newConfig: android.content.res.Configuration) {
+        super.onConfigurationChanged(newConfig)
+        clampToScreen()
+    }
+
+    private fun clampToScreen() {
+        val lp = params ?: return
+        val wm = windowManager ?: return
+        val v = bubble ?: return
+        val dm = resources.displayMetrics
+        val sz = lp.width
+        lp.x = lp.x.coerceIn(0, (dm.widthPixels - sz).coerceAtLeast(0))
+        lp.y = lp.y.coerceIn(0, (dm.heightPixels - sz).coerceAtLeast(0))
+        runCatching { wm.updateViewLayout(v, lp) }
+    }
+
     override fun onDestroy() {
         watcher?.cancel()
         bubble?.let { view ->
@@ -192,7 +212,7 @@ class StartBubbleService : Service() {
             size,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
-                    WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
+                    0, // niente FLAG_LAYOUT_NO_LIMITS: la finestra deve restare dentro lo schermo
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START

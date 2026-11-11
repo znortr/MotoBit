@@ -545,6 +545,46 @@ fun HudScreen(
                     )
                 }
 
+            // ---------------- Modalità display (cambio al volo) ----------------
+            // È la **stessa** impostazione della pagina Risoluzione: un solo
+            // valore salvato, quindi toccare qui aggiorna anche lì (e viceversa).
+            val modeNow by com.nos.motobitride.core.settings.AppSettings.displayMode
+                .collectAsState()
+            OutlinedButton(
+                onClick = {
+                    val app = ctx.applicationContext
+                    Thread {
+                        com.nos.motobitride.core.display.DisplayModeController.select(
+                            app,
+                            com.nos.motobitride.core.settings.DisplayMode.POCKET
+                        )
+                    }.start()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    (if (modeNow == com.nos.motobitride.core.settings.DisplayMode.POCKET) "● " else "○ ") +
+                            AppTexts.get("mode_short_pocket", currentLang)
+                )
+            }
+            OutlinedButton(
+                onClick = {
+                    val app = ctx.applicationContext
+                    Thread {
+                        com.nos.motobitride.core.display.DisplayModeController.select(
+                            app,
+                            com.nos.motobitride.core.settings.DisplayMode.ALWAYS_ON
+                        )
+                    }.start()
+                },
+                modifier = Modifier.fillMaxWidth()
+            ) {
+                Text(
+                    (if (modeNow == com.nos.motobitride.core.settings.DisplayMode.ALWAYS_ON) "● " else "○ ") +
+                            AppTexts.get("mode_short_handlebar", currentLang)
+                )
+            }
+
             // Avviso Shizuku: compare solo se l'interruttore e' ON e Shizuku non e'
             // pronto. Tocco = azione contestuale (installa / avvia / autorizza).
             if (shizukuEnabled && !shizukuStatus.isReady) {

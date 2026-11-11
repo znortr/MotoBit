@@ -199,6 +199,10 @@ object DisplayMaster {
         val dim = dimPercent ?: AppSettings.displayDimPercent.value
         DimOverlay.show(ctx, dimPercent = dim.coerceIn(0, 50))
 
+        // Il cambio di risoluzione ricrea la configurazione e il sistema
+        // riporta la barra: va riasserita ORA, non solo quando si tocca lo switch.
+        runCatching { engine.setNavBar(AppSettings.displayHideNavBar.value) }
+
         AppLog.i(TAG, "Display applicato (via ${engine.lastVia})")
         return Result.APPLIED
     }
@@ -252,11 +256,20 @@ object DisplayMaster {
         return DimOverlay.show(ctx, value)
     }
 
-    /** Barra comandi: solo barra. */
+    /**
+     * Barra comandi: solo barra, e **solo col display modificato**.
+     *
+     * A risoluzione normale la barra deve restare: serve a usare il telefono.
+     * Sparisce quando il display è ridimensionato (allora è solo un peso nel
+     * video, perché il TFT non ha trasparenza e la rende nera piena).
+     */
     @Synchronized
     fun setNavBar(ctx: Context, hidden: Boolean): Boolean {
         AppSettings.setDisplayHideNavBar(hidden)
-        return runCatching { DisplayBridge.current.setNavBar(hidden) }.getOrDefault(false)
+        val active = AppSettings.displayOverride.value
+        return runCatching {
+            DisplayBridge.current.setNavBar(hidden && active)
+        }.getOrDefault(false)
     }
 
     /** Orientamento: solo orientamento. */
