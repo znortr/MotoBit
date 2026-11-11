@@ -527,6 +527,40 @@ il telefono mostra lo schermo intero nello stesso rapporto.
 
 ---
 
+## 16. Taglio del bordo inferiore (crop della barra comandi) — **PROVATO, RIMOSSO: da ripensare**
+
+**Obiettivo**: togliere dal video la barra dei comandi (88 px), che sul TFT è una
+banda nera opaca (il video non ha trasparenza e la barra è semitrasparente).
+
+### Cosa è stato provato (2026-11-11) e perché non va
+
+| Tentativo | Esito |
+|---|---|
+| **1. Crop + ricampionamento nel codificatore** (`HudEncoder.submitImage`): scarta le righe della barra e stira le rimanenti a riempire l'altezza | La banda sparisce ma l'immagine si **deforma del +11%** (contenuto 776 → 864). Scartato |
+| **2. Crop sul display**: `wm size` con altezza = contenuto TFT + altezza barra (680×952), lasciando la barra fuori dall'area catturata (680×864) | **Non funziona**: l'altezza non viene ridimensionata come atteso. Scartato |
+
+### Fatti accertati (da non ridiscutere)
+
+- La barra comandi **è dentro il display**: `wm size` non può escluderla, si prende sempre la sua fetta.
+- `policy_control = immersive.navigation=*` è **ignorato** da ColorOS (misurato: scritto, ma `navigationBars visible=true`).
+- `WindowInsetsController.hide()` funziona **solo dentro MotoBit**, non nelle app di terzi (Mapy/Maps).
+- Con la navigazione a **gesti** la banda non c'è — ma è un cambio **globale** che fa riavviare la UI di sistema (sfarfallio): scartato dall'utente.
+
+### Cosa verificare prima di riprovare
+
+- [ ] La `VirtualDisplay` creata con altezza **minore** del display: `AUTO_MIRROR` **ritaglia** o **riscala**? Finché non si sa, ogni implementazione è al buio. Serve una prova col TFT collegato.
+- [ ] Se **ritaglia**: la soluzione del tentativo 2 diventa corretta una volta capito perché la geometria non veniva applicata.
+- [ ] Se **riscala**: serve un crop GL che mantenga la misura negoziata e riempia le righe in fondo con l'ultima riga di contenuto (nessuna stiratura).
+- [ ] Decidere se accettare la banda (situazione attuale) o investire su questa strada.
+
+### Stato del codice
+
+Requisiti rimossi da `DisplayMaster.plan()`, `HudEncoder.submitImage` e dalla pagina
+Risoluzione. Resta solo `AppSettings.displayCropPx` (inutilizzato) come gancio per la
+prossima implementazione: se non serve più, va eliminato.
+
+---
+
 ## ✅ Chiusi / spiegati
 
 ### Notifica di mirroring persistente a app chiusa — **corretto in 2.0.3**

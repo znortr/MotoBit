@@ -41,6 +41,17 @@ import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 import kotlin.math.roundToInt
 
+/** Altezza reale della barra comandi del telefono, in pixel. */
+private fun navBarHeightPx(ctx: android.content.Context): Int {
+    val res = ctx.resources
+    val id = res.getIdentifier("navigation_bar_height", "dimen", "android")
+    return if (id > 0) {
+        runCatching { res.getDimensionPixelSize(id) }.getOrDefault(0)
+    } else {
+        (48 * res.displayMetrics.density).toInt()
+    }
+}
+
 /**
  * Pagina "Risoluzione".
  *
@@ -74,6 +85,8 @@ fun SettingsResolutionScreen(
     val overrideActive by AppSettings.displayOverride.collectAsState()
     val displayMode by AppSettings.displayMode.collectAsState()
     val bubbleDim by AppSettings.displayBubbleDim.collectAsState()
+    val cropPx by AppSettings.displayCropPx.collectAsState()
+    val cropOn = cropPx > 0
 
     var prepared by remember { mutableStateOf(DisplaySetup.isReady(ctx)) }
     var busy by remember { mutableStateOf(false) }
@@ -357,6 +370,8 @@ fun SettingsResolutionScreen(
                 }
             )
         }
+
+        // NOTA: il "taglio del bordo inferiore" è stato rimosso — vedi TODO §16.
 
         HorizontalDivider()
 

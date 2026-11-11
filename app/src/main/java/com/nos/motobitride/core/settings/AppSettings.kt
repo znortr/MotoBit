@@ -65,6 +65,7 @@ object AppSettings {
     private const val KEY_DISPLAY_MODE = "display_mode"
     private const val KEY_DISPLAY_ORIG_DP = "display_orig_dp"
     private const val KEY_DISPLAY_BUBBLE_DIM = "display_bubble_dim"
+    private const val KEY_DISPLAY_CROP_PX = "display_crop_px"
 
     /**
      * Versione delle preferenze del display.
@@ -272,6 +273,7 @@ object AppSettings {
         _displayMode.value = DisplayMode.fromStored(p.getString(KEY_DISPLAY_MODE, null))
         _displayOrigDp.value = p.getInt(KEY_DISPLAY_ORIG_DP, 0)
         _displayBubbleDim.value = p.getBoolean(KEY_DISPLAY_BUBBLE_DIM, true)
+        _displayCropPx.value = p.getInt(KEY_DISPLAY_CROP_PX, 0)
         // La modalità "auto" non esiste più: solo verticale o orizzontale.
         if (_displayRotation.value == "auto") _displayRotation.value = "portrait"
         _autoConnect.value = if (p.contains(KEY_AUTO_CONNECT)) {
@@ -433,6 +435,25 @@ object AppSettings {
         _displayOrigDp.value = dp
         prefs?.edit()?.putInt(KEY_DISPLAY_ORIG_DP, dp)?.apply()
         AppLog.i(TAG, "Larghezza originale del telefono: ${dp}dp")
+    }
+
+    /**
+     * Righe da tagliare in fondo al frame, prima della codifica.
+     *
+     * `0` = nessun taglio (comportamento identico a prima). Si usa l'altezza
+     * **reale** della barra comandi del telefono, calcolata dalla pagina
+     * impostazioni: così il taglio combacia con quello che c'è da togliere.
+     * Il flusso resta della misura negoziata: si taglia e si ricampiona a
+     * righe intere, senza toccare encoder né protocollo.
+     */
+    private val _displayCropPx = MutableStateFlow(0)
+    val displayCropPx: StateFlow<Int> = _displayCropPx.asStateFlow()
+
+    fun setDisplayCropPx(px: Int) {
+        val v = px.coerceIn(0, 400)
+        _displayCropPx.value = v
+        prefs?.edit()?.putInt(KEY_DISPLAY_CROP_PX, v)?.apply()
+        AppLog.i(TAG, "Taglio del bordo inferiore: ${v}px")
     }
 
     fun setDisplayDensityScale(enabled: Boolean) {

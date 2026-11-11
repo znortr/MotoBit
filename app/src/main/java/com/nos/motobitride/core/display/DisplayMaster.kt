@@ -178,6 +178,13 @@ object DisplayMaster {
         val plan = plan(ctx) ?: return Result.UNSAFE
         val engine = DisplayBridge.current
 
+        // ⚠️ ORDINE: il flag va alzato PRIMA di toccare il display.
+        // Il cambio di risoluzione fa scattare `onConfigurationChanged`, che
+        // decide se nascondere la barra leggendo questo flag: se lo alzassi
+        // dopo, la barra non si nasconderebbe.
+        AppSettings.setDisplayOverride(true)
+        markOverride(ctx, true)
+
         val ok = runCatching {
             engine.apply(plan.width, plan.height, plan.density, plan.rotationMode)
         }.getOrDefault(false)
@@ -221,6 +228,14 @@ object DisplayMaster {
      */
     @Synchronized
     fun restoreWith(ctx: Context, originals: String): Boolean {
+        // ⚠️ ORDINE: il flag va ABBASSATO PRIMA del ripristino.
+        // `wm size reset` fa scattare `onConfigurationChanged` subito: se il
+        // flag fosse ancora alto, l'app ri-nasconderebbe la barra comandi e
+        // nessuno la rimostrerebbe più (difetto: "torno alla risoluzione
+        // normale e la barra non riappare").
+        runCatching { AppSettings.setDisplayOverride(false) }
+        markOverride(ctx, false)
+
         val ok = runCatching { DisplayBridge.current.restore(originals) }.getOrDefault(false)
 
         DimOverlay.hide(ctx)
