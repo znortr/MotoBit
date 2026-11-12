@@ -80,6 +80,7 @@ object ProximityMode {
 
     @Synchronized
     fun stop() {
+        cancelPendingCover()
         val sm = sensorManager
         val l = listener
         if (sm != null && l != null) runCatching { sm.unregisterListener(l) }
@@ -90,6 +91,20 @@ object ProximityMode {
         running = false
     }
 
+    private val handler = android.os.Handler(android.os.Looper.getMainLooper())
+    private var pendingCover: Runnable? = null
+
+    private fun cancelPendingCover() {
+        pendingCover?.let { handler.removeCallbacks(it) }
+        pendingCover = null
+    }
+
+    /**
+     * Ritardo **solo in copertura**.
+     *
+     * Scoprendo il sensore non si aspetta nulla: si ripristina subito. Il
+     * ritardo serve solo a non far scattare tutto per uno sfioramento.
+     */
     private fun onTransition(context: Context, isCovered: Boolean) {
         if (covered == null) {
             covered = isCovered
@@ -99,16 +114,29 @@ object ProximityMode {
         if (covered == isCovered) return
         covered = isCovered
 
-        // L'oscuramento è **quello della barra** (0–50%), non un valore fisso.
-        val dim = AppSettings.displayDimPercent.value.coerceIn(0, 50)
-        AppLog.i(
-            TAG,
-            if (isCovered) "Coperto: oscuro al $dim% + risoluzione" else "Scoperto: ripristino"
-        )
+        if (!isCovered) {
+            // SCOPRIRE: nessun ritardo. Annulla l'attesa e ripristina subito.
+            cancelPendingCover()
+            AppLog.i(TAG, "Scoperto: ripristino immediato")
+            Thread { DisplayMaster.restoreAll(context) }.start()
+            return
+        }
 
-        Thread {
-            if (isCovered) DisplayMaster.applyAll(context, dimPercent = dim)
-            else DisplayMaster.restoreAll(context)
-        }.start()
+        // COPRIRE: si attende il ritardo scelto (0-5 s).
+        val dim = AppSettings.displayDimPercent.value.coerceIn(0, 50)
+        val delayMs = AppSettings.displayPocketDelaySec.value.coerceIn(0, 5) * 1000L
+        val apply = Runnable {
+            pendingCover = null
+            AppLog.i(TAG, "Coperto: oscuro al $dim% + risoluzione (dopo ${delayMs}ms)")
+            Thread { DisplayMaster.applyAll(context, dimPercent = dim) }.start()
+        }
+        cancelPendingCover()
+        if (delayMs <= 0L) {
+            apply.run()
+        } else {
+            pendingCover = apply
+            handler.postDelayed(apply, delayMs)
+            AppLog.i(TAG, "Coperto: attendo ${delayMs}ms prima di applicare")
+        }
     }
 }

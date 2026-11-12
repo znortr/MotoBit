@@ -87,6 +87,7 @@ fun SettingsResolutionScreen(
     val bubbleDim by AppSettings.displayBubbleDim.collectAsState()
     val cropPx by AppSettings.displayCropPx.collectAsState()
     val cropOn = cropPx > 0
+    val pocketDelay by AppSettings.displayPocketDelaySec.collectAsState()
 
     var prepared by remember { mutableStateOf(DisplaySetup.isReady(ctx)) }
     var busy by remember { mutableStateOf(false) }
@@ -261,9 +262,21 @@ fun SettingsResolutionScreen(
             }
         }
 
-        HorizontalDivider()
+        // Ritardo del sensore (solo in copertura): 0-5 s, default 1 s.
+        if (displayMode == DisplayMode.POCKET) {
+            Text(
+                "${AppTexts.get("pocket_delay", currentLang)}: ${pocketDelay}s",
+                style = MaterialTheme.typography.bodyMedium
+            )
+            Slider(
+                value = pocketDelay.toFloat(),
+                onValueChange = { AppSettings.setDisplayPocketDelaySec(it.roundToInt()) },
+                valueRange = 0f..5f,
+                steps = 4
+            )
+        }
 
-        // ---------------- Percentuale del formato TFT ----------------
+        HorizontalDivider()
         Text(
             "${AppTexts.get("res_percent", currentLang)}: $scale%",
             style = MaterialTheme.typography.titleSmall
@@ -383,16 +396,21 @@ fun SettingsResolutionScreen(
         Slider(
             value = dimPercent.toFloat(),
             onValueChange = { AppSettings.setDisplayDimPercent(it.roundToInt()) },
-            onValueChangeFinished = {
-                val value = AppSettings.displayDimPercent.value
-                scope.launch {
-                    withContext(Dispatchers.IO) { DisplayMaster.applyDimOnly(ctx, value) }
-                }
-            },
-            enabled = !busy,
+            enabled = true,
             valueRange = 0f..50f,
             steps = 9
         )
+
+        // L'oscuramento si applica a OGNI cambiamento del valore, non al
+        // "fine trascinamento": quel callback non scattava in modo affidabile
+        // (nessuna riga in log, luminosità mai toccata) ed era la causa della
+        // barra "senza alcun effetto".
+        androidx.compose.runtime.LaunchedEffect(dimPercent) {
+            kotlinx.coroutines.delay(120)   // evita una scrittura per ogni pixel
+            withContext(Dispatchers.IO) {
+                runCatching { DisplayMaster.applyDimOnly(ctx, dimPercent) }
+            }
+        }
 
         HorizontalDivider()
 

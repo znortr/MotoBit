@@ -66,6 +66,7 @@ object AppSettings {
     private const val KEY_DISPLAY_ORIG_DP = "display_orig_dp"
     private const val KEY_DISPLAY_BUBBLE_DIM = "display_bubble_dim"
     private const val KEY_DISPLAY_CROP_PX = "display_crop_px"
+    private const val KEY_POCKET_DELAY_SEC = "pocket_delay_sec"
 
     /**
      * Versione delle preferenze del display.
@@ -274,6 +275,7 @@ object AppSettings {
         _displayOrigDp.value = p.getInt(KEY_DISPLAY_ORIG_DP, 0)
         _displayBubbleDim.value = p.getBoolean(KEY_DISPLAY_BUBBLE_DIM, true)
         _displayCropPx.value = p.getInt(KEY_DISPLAY_CROP_PX, 0)
+        _displayPocketDelaySec.value = p.getInt(KEY_POCKET_DELAY_SEC, 1).coerceIn(0, 5)
         // La modalità "auto" non esiste più: solo verticale o orizzontale.
         if (_displayRotation.value == "auto") _displayRotation.value = "portrait"
         _autoConnect.value = if (p.contains(KEY_AUTO_CONNECT)) {
@@ -448,6 +450,23 @@ object AppSettings {
      */
     private val _displayCropPx = MutableStateFlow(0)
     val displayCropPx: StateFlow<Int> = _displayCropPx.asStateFlow()
+
+    /**
+     * Ritardo (0–5 s) prima di applicare oscuramento e risoluzione quando il
+     * sensore viene **coperto**.
+     *
+     * Serve a evitare che un semplice sfioramento faccia scattare tutto.
+     * Quando il sensore viene **scoperto** NON c'è attesa: si ripristina subito.
+     */
+    private val _displayPocketDelaySec = MutableStateFlow(1)
+    val displayPocketDelaySec: StateFlow<Int> = _displayPocketDelaySec.asStateFlow()
+
+    fun setDisplayPocketDelaySec(sec: Int) {
+        val v = sec.coerceIn(0, 5)
+        _displayPocketDelaySec.value = v
+        prefs?.edit()?.putInt(KEY_POCKET_DELAY_SEC, v)?.apply()
+        AppLog.i(TAG, "Ritardo sensore in tasca: ${v}s")
+    }
 
     fun setDisplayCropPx(px: Int) {
         val v = px.coerceIn(0, 400)

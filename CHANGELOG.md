@@ -4,6 +4,31 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🔧 2.7.1 — Oscuramento riparato + ritardo del sensore
+
+**Data**: 2026-11-12 · **versionCode**: 2701
+
+### Oscuramento: la barra non aveva effetto (riparato)
+Diagnosi sul dispositivo: `WRITE_SETTINGS: allow`, `SYSTEM_ALERT_WINDOW: allow`, luminosità mai toccata e **nessuna riga in log** → `DimOverlay.show()` non veniva mai chiamato.
+Causa: l'applicazione era agganciata a `onValueChangeFinished` dello slider, che non scattava in modo affidabile.
+Correzione: `LaunchedEffect(dimPercent)` con debounce 120 ms → applica a ogni cambiamento. Rimossa anche la condizione `enabled = !busy` sullo slider.
+
+### Ritardo del sensore ("telefono in tasca")
+- Nuova preferenza `displayPocketDelaySec`: **0-5 s, default 1 s**
+- Barra **subito sotto il pulsante della modalità**, visibile solo in quella modalità
+- **Asimmetrico, come richiesto**:
+  - **coprendo** il sensore → attende il ritardo scelto, poi oscura + cambia risoluzione
+  - **scoprendo** il sensore → **nessun ritardo**: attesa annullata e ripristino immediato
+- `cancelPendingCover()` anche in `stop()`: nessun runnable orfano al cambio modalità
+
+### Ancora da fare (prossima consegna)
+- b) Opzioni sviluppo: switch log spostato/rinominato, keep alive orologio commentato, descrizione sincronizzazione orologio TFT
+- c) Permessi: margine inferiore, switch al posto dei check, apertura pagina autorizzazioni
+- e) «Avvia/Ferma mirroring» → «Pausa/Riprendi» accanto a «Chiudi»
+- a) Pulizia dei residui (`displayCropPx`, `navBarHeightPx`, stringhe inutilizzate)
+
+---
+
 ## 🔧 2.7.0 — Bolla AVVIA, annullamenti, notifiche nere, barra comandi
 
 **Data**: 2026-11-12 · **versionCode**: 2700
