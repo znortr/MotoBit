@@ -1,0 +1,164 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Settings — language: English (en-GB) -->
+<texts>
+
+    <text id="settings_title">Settings</text>
+    <text id="settings_menu_title">Settings</text>
+    <text id="settings_menu_sub">Configure the app, the connection and permissions</text>
+    <text id="settings_cat_general_title">General</text>
+    <text id="settings_cat_general_sub">Language and app theme</text>
+    <text id="settings_cat_connections_title">Connections</text>
+    <text id="settings_cat_connections_sub">Connection and reconnection behaviour</text>
+    <text id="settings_cat_resolution_title">Resolution</text>
+    <text id="settings_cat_resolution_sub">Screen size sent to the TFT</text>
+    <text id="settings_cat_permissions_title">Permissions</text>
+    <text id="settings_cat_permissions_sub">Granting the required permissions</text>
+    <text id="settings_cat_development_title">Developer Options</text>
+    <text id="settings_cat_development_sub">Diagnostics and experimental settings</text>
+
+    <text id="settings_language_title">App Language</text>
+    <text id="settings_language_desc">Select the interface language.</text>
+    <text id="settings_theme_title">Graphic Theme</text>
+    <text id="settings_theme_desc">Select the application appearance.</text>
+
+    <text id="settings_vibrate_toast">Vibration enabled</text>
+    <text id="settings_startup_title">Startup Behavior</text>
+    <text id="settings_startup_manual">Saved credentials only</text>
+    <text id="settings_startup_manual_desc">Shows saved HUD name. Link and video start only by pressing Start.</text>
+    <text id="settings_startup_autolink">Connect HUD</text>
+    <text id="settings_startup_autolink_desc">Rebuilds Wi-Fi Direct automatically and shows name. Video starts only by pressing Start.</text>
+    <text id="settings_startup_autolink_stream">Connect and stream</text>
+    <text id="settings_startup_autolink_stream_desc">Rebuilds link and also starts video. Android still requests screen capture consent.</text>
+    <text id="settings_encoder_idle_title">Active reconnection wait</text>
+    <text id="settings_encoder_idle_desc">How many minutes the app actively tries to reconnect to the TFT. Beyond that it switches to passive listening: no attempts, but reconnection still happens automatically when the TFT returns.</text>
+    <text id="settings_active_wait_label">Active wait: %d min</text>
+    <text id="settings_home_diag_title">Diagnostics card on Home</text>
+    <text id="settings_home_diag_desc">Shows HUD, status, IP and link event at the top of Home. Default: hidden.</text>
+    <text id="settings_auto_connect_title">Automatic connection</text>
+    <text id="settings_auto_connect_desc">On startup the app waits and connects by itself as soon as it finds the TFT. If disabled, connection starts from the button on Home.</text>
+    <text id="settings_vibrate_title">Vibrate on connection</text>
+    <text id="settings_vibrate_desc">Short vibration when the TFT link connects or is lost. Useful with the phone in your pocket.</text>
+    <text id="settings_clock_sync_title">TFT Clock Synchronization</text>
+    <text id="settings_clock_sync_desc">Sets the TFT clock sync packets to fix time issues. Default 3 packets: increase if your TFT resets the time.</text>
+    <text id="settings_clock_sync_label">Sync packets: %d</text>
+    <text id="settings_diagnostics_entry">Log &amp; Diagnostics</text>
+    <text id="settings_diagnostics_entry_desc">View live events and configure file log saving.</text>
+
+    <text id="perm_section_title">Permissions &amp; reliability</text>
+    <text id="perm_section_desc">Required for the Wi-Fi Direct link and for automatic reconnection while the app is in background.</text>
+    <text id="perm_all_ok">All good: automatic reconnection works in background too.</text>
+    <text id="perm_location_title">Precise location</text>
+    <text id="perm_location_desc">Required: Android needs it for the Wi-Fi Direct APIs.</text>
+    <text id="perm_gps_title">System location (GPS)</text>
+    <text id="perm_gps_desc">Must be ON: with location off Android refuses to look for the TFT.</text>
+    <text id="perm_notif_title">Notifications</text>
+    <text id="perm_notif_desc">Needed for the mirroring service notification.</text>
+    <text id="perm_battery_title">Battery optimization</text>
+    <text id="perm_battery_desc">Exclude the app so reconnection is not frozen.</text>
+    <text id="perm_overlay_title">Display over other apps</text>
+    <text id="perm_overlay_desc">Used by the START button shown over the app when the TFT is not connected.</text>
+    <text id="perm_ok">OK</text>
+    <text id="perm_missing">Not granted</text>
+    <text id="perm_grant">Grant</text>
+    <text id="perm_open_settings">Open settings</text>
+    <text id="perm_enable">Enable</text>
+    <text id="perm_disable">Disable</text>
+
+    <text id="shizuku_section_title">Shizuku</text>
+    <text id="shizuku_switch_title">Use Shizuku</text>
+    <text id="shizuku_switch_desc">Master switch: when OFF the app never uses Shizuku.</text>
+    <text id="shizuku_status_not_installed">Shizuku not installed</text>
+    <text id="shizuku_status_not_running">Shizuku not running</text>
+    <text id="shizuku_status_not_authorized">Shizuku not authorized</text>
+    <text id="shizuku_status_ready">Shizuku ready</text>
+    <text id="shizuku_status_disabled">Shizuku disabled</text>
+    <text id="shizuku_action_install">Install</text>
+    <text id="shizuku_action_open">Start Shizuku</text>
+    <text id="shizuku_action_grant">Authorize</text>
+    <text id="shizuku_home_hint">Shizuku not active: tap to enable</text>
+    <text id="shizuku_home_install">Install Shizuku</text>
+    <text id="shizuku_home_activate">Start Shizuku</text>
+
+    <text id="setup_title">Prepare MotoBit (once)</text>
+    <text id="setup_needed">Needed to change and restore the screen size.</text>
+    <text id="setup_ready">Ready: Shizuku is no longer needed.</text>
+    <text id="setup_working">Preparing…</text>
+    <text id="setup_need_shizuku">Start Shizuku first</text>
+    <text id="setup_action">Prepare now</text>
+    <text id="res_not_ready">Prepare MotoBit first: it is needed only once.</text>
+    <text id="res_scale_title">TFT format percentage</text>
+    <text id="res_preview">Will be applied</text>
+    <text id="res_active">Active (via %s)</text>
+    <text id="res_density">Scale density too</text>
+    <text id="res_rotation">Rotation</text>
+    <text id="res_rot_auto">Auto</text>
+    <text id="res_rot_portrait">Portrait</text>
+    <text id="res_rot_landscape">Landscape</text>
+    <text id="res_navbar">Hide navigation bar</text>
+    <text id="res_dim">Dim screen</text>
+    <text id="res_dim_desc">Lowers brightness: the screen stays on</text>
+    <text id="res_master_title">Phone resolution</text>
+    <text id="res_master_desc">When on, the screen is dimmed and set to the dashboard format</text>
+    <text id="res_unsafe">Unsafe configuration: nothing was changed</text>
+    <text id="res_crop_title">Crop the bottom edge</text>
+    <text id="res_crop_desc">Removes the navigation bar from the video: that space is wasted on the TFT anyway. Optional, can be turned off.</text>
+    <text id="res_percent">TFT format percentage</text>
+    <text id="res_orient">Orientation</text>
+    <text id="res_apply">Apply</text>
+    <text id="res_restore">Restore all</text>
+    <text id="res_apply_locked">Apply is locked until the restore gestures are active (volume keys and power button). This prevents making the phone unusable again.</text>
+    <text id="res_apply_hint">The resolution is applied by the bubble, or by covering the sensor in pocket mode.</text>
+
+    <text id="mode_title">Mode</text>
+    <text id="mode_manual">Volume +</text>
+    <text id="mode_pocket">Phone in pocket</text>
+    <text id="mode_always_on">Phone on the handlebar</text>
+    <text id="mode_short_pocket">In Pocket</text>
+    <text id="mode_short_handlebar">On Handlebar</text>
+    <text id="mode_pocket_unsupported">This phone cannot turn the screen off with the sensor (mode unavailable)</text>
+    <text id="bubble_dim">The bubble also dims</text>
+    <text id="pocket_delay">Sensor delay (covering only)</text>
+
+    <text id="guide_link">Step-by-step guide</text>
+    <text id="guide_title">How to prepare MotoBit</text>
+    <text id="guide_intro">MotoBit needs a small helper to change the screen size. You do it once: after that it is no longer needed.</text>
+    <text id="guide_note_reboot">Keep Shizuku installed: after the setup it is no longer needed, but it is the backup if the permissions are ever lost.</text>
+    <text id="guide_step1_title">Install Shizuku</text>
+    <text id="guide_step1_desc">Open the Play Store, search for Shizuku and tap Install. When it is done, come back here.</text>
+    <text id="guide_step2_title">Turn on developer options</text>
+    <text id="guide_step2_desc">Open Settings, tap About phone, then tap Build number seven times. You will see You are now a developer. If not, tap again.</text>
+    <text id="guide_step3_title">Turn on wireless debugging</text>
+    <text id="guide_step3_desc">Go back, open System then Developer options, and turn on Wireless debugging. Keep Wi-Fi on.</text>
+    <text id="guide_step4_title">Pair Shizuku</text>
+    <text id="guide_step4_desc">Open Shizuku and tap Start. Choose Pair with code: a notification shows six numbers. Type them in Shizuku and tap Pair.</text>
+    <text id="guide_step5_title">Start Shizuku</text>
+    <text id="guide_step5_desc">Tap Start again. Shizuku must show Running.</text>
+    <text id="guide_step6_title">Authorize MotoBit</text>
+    <text id="guide_step6_desc">Open MotoBit, go to Settings, then Permissions, tap Shizuku and then Authorize. Choose Allow.</text>
+    <text id="guide_step7_title">Prepare MotoBit</text>
+    <text id="guide_step7_desc">Still in Permissions, tap Prepare now and wait for Ready. After this, Shizuku is no longer needed.</text>
+    <text id="guide_res_title">How to use the resolution</text>
+    <text id="guide_res_1">Open Settings, then Resolution.</text>
+    <text id="guide_res_2">Pick a percentage: higher means finer text on the dashboard.</text>
+    <text id="guide_res_3">Tap the bubble or cover the sensor to apply.</text>
+    <text id="guide_res_4">If something is wrong, switch the screen off and on with the power button: everything goes back.</text>
+    <text id="guide_trouble_title">If something is wrong</text>
+    <text id="guide_trouble_1">Shizuku does not start: repeat step 4 (pair with code), then step 5.</text>
+    <text id="guide_trouble_2">Permissions say Start Shizuku first: open Shizuku, tap Start and come back here.</text>
+    <text id="guide_trouble_3">The resolution is not applied: open Shizuku, tap Start, then in Permissions tap Prepare now.</text>
+    <text id="guide_trouble_4">You changed phone or cleared MotoBit data: do everything again from the start.</text>
+
+    <text id="resolution_next_phase_title">Resolution settings</text>
+    <text id="resolution_next_phase_desc">Percentage, dimming, rotation and nav bar will be available in the next phase.</text>
+
+    <text id="diag_title">Diagnostics</text>
+    <text id="diag_section_title">Diagnostics Log</text>
+    <text id="diag_switch_title">Enable log</text>
+    <text id="diag_switch_desc">Writes the full log (channels, session, protocol) to the app's Documents folder.</text>
+    <text id="diag_footer">With switch active, full log is written to file in Documents; with switch off, file writing is disabled.</text>
+    <text id="diag_clear_button">Clear</text>
+    <text id="diag_toast_cleared">Log cleared</text>
+    <text id="diag_keepalive_title">PXC periodic clock keepalive (5 min)</text>
+    <text id="diag_keepalive_desc">Clock push NOT requested by the TFT on the control socket. Measured that the TFT does not read it: it stays queued and blocks ACKs, making the TFT close the session. Leave OFF.</text>
+
+</texts>
