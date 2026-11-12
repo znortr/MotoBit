@@ -95,29 +95,6 @@ fun SettingsDevelopmentScreen(
             style = MaterialTheme.typography.titleSmall
         )
 
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .padding(vertical = 2.dp),
-            verticalAlignment = Alignment.CenterVertically
-        ) {
-            Column(Modifier.weight(1f)) {
-                Text(
-                    text = AppTexts.get("diag_switch_title", currentLang),
-                    style = MaterialTheme.typography.bodyLarge
-                )
-                Text(
-                    text = AppTexts.get("diag_switch_desc", currentLang),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant
-                )
-            }
-            Switch(
-                checked = diagLogEnabled,
-                onCheckedChange = { AppSettings.setDiagLogEnabled(it) }
-            )
-        }
-
         // Card diagnostica in Home: nascosta di default, si accende da qui.
         Row(
             modifier = Modifier
@@ -148,8 +125,12 @@ fun SettingsDevelopmentScreen(
             color = MaterialTheme.colorScheme.onSurfaceVariant
         )
 
-        HorizontalDivider()
-
+        /*
+         * INTERRUTTORE RIMOSSO (2026-11-12): il push periodico dell'orologio si è
+         * rivelato inutile e intasava la socket PXC. Il codice resta qui,
+         * commentato, per reversibilità. In `AppSettings` il valore viene forzato
+         * a `false` all'avvio, quindi il keepalive non parte comunque.
+         *
         // Interruttore di bisazione: push orologio periodico sulla socket PXC.
         Row(
             modifier = Modifier
@@ -173,8 +154,33 @@ fun SettingsDevelopmentScreen(
                 onCheckedChange = { AppSettings.setPeriodicClockKeepalive(it) }
             )
         }
+         */
 
         HorizontalDivider()
+
+        // Interruttore del log: SUBITO SOPRA il riquadro, come richiesto.
+        Row(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(vertical = 2.dp),
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Column(Modifier.weight(1f)) {
+                Text(
+                    text = AppTexts.get("diag_switch_title", currentLang),
+                    style = MaterialTheme.typography.bodyLarge
+                )
+                Text(
+                    text = AppTexts.get("diag_switch_desc", currentLang),
+                    style = MaterialTheme.typography.bodySmall,
+                    color = MaterialTheme.colorScheme.onSurfaceVariant
+                )
+            }
+            Switch(
+                checked = diagLogEnabled,
+                onCheckedChange = { AppSettings.setDiagLogEnabled(it) }
+            )
+        }
 
         LogPanel(
             modifier = Modifier.fillMaxWidth(),
