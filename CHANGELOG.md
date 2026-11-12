@@ -4,6 +4,54 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🔧 2.7.4 — Testi in XML per lingua (i18n) + documentazione
+
+**Data**: 2026-11-12 · **versionCode**: 2704
+
+### I testi escono dal codice
+| | Prima | Adesso |
+|---|---|---|
+| Dove | `AppTexts.kt`: **518 righe**, due mappe Kotlin | `assets/texts/`, una cartella per lingua |
+| Cambiare un testo | modifica al codice + ricompilazione | **modifica all'XML** |
+| Aggiungere una lingua | 227 righe copiate nel sorgente | **1 riga** in `languages.xml` + 1 cartella |
+| `AppTexts.kt` | 518 righe | **41 righe** (solo ponte) |
+
+```
+assets/texts/
+    languages.xml                  elenco lingue (id, nome, bandiera, cartella)
+    it-IT/  ui.xml  settings.xml  hud.xml
+    en-GB/  ui.xml  settings.xml  hud.xml
+```
+
+- **`LanguageTexts.kt`** (nuovo): legge gli XML con `XmlPullParser`, cache per lingua/categoria, normalizza `it`→`it-IT`, fallback **lingua → inglese → `[chiave]`**. Chi chiama non deve sapere in quale dei tre file sta la chiave.
+- **`AppTexts.get(chiave, lingua)`**: ponte verso `LanguageTexts`; `AppTexts.init(context)` chiamato in `MainActivity.onCreate`.
+- **Audit di completezza**: 227 chiavi IT, 227 EN, 227 nel codice → **zero mancanti** (controllo con `Compare-Object`).
+
+### Altro in questa versione
+- **b1**: switch del log rinominato **«Attiva log»**; **b3**: descrizione sincronizzazione orologio TFT riscritta (default 3 pacchetti, aumenta se il TFT azzera l'ora)
+- **e**: «Avvia/Ferma mirroring» → **«Riprendi / Pausa»** (IT e EN)
+- **`design/README.md`**: percorsi dei file lingua e procedura per aggiungere una lingua nuova
+
+---
+
+## 🔧 2.7.3 — Opzioni sviluppo
+
+**Data**: 2026-11-12 · **versionCode**: 2703
+
+- Switch del log **spostato subito sopra il riquadro del log** (era in mezzo alle altre opzioni)
+- **Keep alive orologio periodico**: interruttore **rimosso** dalla UI, codice **commentato** e non eliminato (reversibile). Il valore era già OFF: nessun cambiamento di comportamento
+
+---
+
+## 🔧 2.7.2 — Etichette e pulizia
+
+**Data**: 2026-11-12 · **versionCode**: 2702
+
+- `hud_mirroring_start` / `hud_mirroring_stop` → **«Riprendi» / «Pausa»**
+- Rimossi `navBarHeightPx()`, `cropPx`, `cropOn` da `SettingsResolutionScreen` (codice morto dopo la rimozione del taglio del bordo)
+
+---
+
 ## 🔧 2.7.1 — Oscuramento riparato + ritardo del sensore
 
 **Data**: 2026-11-12 · **versionCode**: 2701
