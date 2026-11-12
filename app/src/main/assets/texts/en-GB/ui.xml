@@ -1,0 +1,72 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Common, Home, Garage, QR — language: English (en-GB) -->
+<texts>
+
+    <text id="app_name">Motobit Ride</text>
+    <text id="common_back">Back</text>
+    <text id="common_close">Close</text>
+    <text id="common_start">Start</text>
+    <text id="common_stop">Stop</text>
+    <text id="common_retry">Retry</text>
+    <text id="common_clear">Clear</text>
+    <text id="common_name">Name</text>
+    <text id="common_save">Save</text>
+    <text id="common_cancel">Cancel</text>
+
+    <text id="theme_dark">🌙 Dark</text>
+    <text id="theme_light">☀️ Light</text>
+    <text id="theme_system">📱 System</text>
+
+    <text id="hud_saved_card">Saved HUD</text>
+    <text id="hud_connection_title">HUD Connection</text>
+    <text id="hud_status">Link status: </text>
+    <text id="hud_ip">IP Address: </text>
+    <text id="hud_scan_qr">Scan QR</text>
+    <text id="hud_no_saved">No saved HUD. Scan the QR Code displayed on the motorcycle display.</text>
+    <text id="hud_battery_warning">Battery optimization active</text>
+    <text id="hud_battery_desc">The app might be stopped in background while riding. Disable optimization for Motobit Ride.</text>
+    <text id="hud_disable">Disable</text>
+
+    <text id="qr_scan_title">Scan QR</text>
+    <text id="qr_scan_instruction">Frame the QR on the TFT of the motorcycle you want to connect.</text>
+    <text id="qr_scan_permission">Camera permission is required to scan the QR.</text>
+
+    <text id="garage_title">Garage</text>
+    <text id="garage_sub">Vehicle data, deadlines and TFT connection</text>
+    <text id="garage_vehicle_card">Vehicle</text>
+    <text id="garage_name_label">Bike name</text>
+    <text id="garage_name_hint">Leave empty to use the HUD name</text>
+    <text id="garage_plate_label">Plate</text>
+    <text id="garage_deadline_revision">Technical inspection</text>
+    <text id="garage_deadline_tax">Road tax</text>
+    <text id="garage_deadline_insurance">Insurance</text>
+    <text id="garage_month_label">Month</text>
+    <text id="garage_day_label">Day</text>
+    <text id="garage_day_whole_month">Whole month</text>
+    <text id="garage_deadline_info_title">How the day works</text>
+    <text id="garage_deadline_info_text">The day is free: if the deadline is "within the month" leave 0 (the last day of the month is used), if it is a precise date enter the exact day (1-31).</text>
+    <text id="garage_info_card">Information</text>
+    <text id="garage_notifications_card">Deadline reminders</text>
+    <text id="garage_notifications_switch">Send me notifications</text>
+    <text id="garage_notifications_desc">Reminders for inspection, road tax and insurance.</text>
+    <text id="garage_days_before_label">Remind me %d days before</text>
+    <text id="garage_forget">Forget</text>
+    <text id="garage_forget_confirm_title">Forget this vehicle?</text>
+    <text id="garage_forget_confirm_text">Connection data, name, plate and deadlines will be deleted. This cannot be undone.</text>
+    <text id="garage_scan_qr">Scan QR</text>
+    <text id="garage_rearm">Re-enable reminder</text>
+    <text id="garage_countdown_today">today</text>
+    <text id="garage_countdown_days">in %d days</text>
+    <text id="garage_countdown_months">in %d months</text>
+    <text id="garage_countdown_none">not set</text>
+    <text id="garage_edit_title">Name and plate</text>
+    <text id="garage_deadlines_button">Deadlines</text>
+    <text id="garage_deadlines_none">No deadline set</text>
+    <text id="garage_info_button">Technical info</text>
+    <text id="garage_info_sub">HUD, SSID, MAC, resolution</text>
+    <text id="garage_info_hud">HUD</text>
+    <text id="garage_info_model">Model</text>
+    <text id="garage_info_resolution">Resolution</text>
+    <text id="garage_info_protocol">Protocol</text>
+
+</texts>

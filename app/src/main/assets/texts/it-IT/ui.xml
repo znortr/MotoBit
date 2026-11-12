@@ -1,0 +1,77 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Testi comuni, Home, Garage, QR — lingua: Italiano (it-IT) -->
+<texts>
+
+    <!-- Comuni -->
+    <text id="app_name">Motobit Ride</text>
+    <text id="common_back">Indietro</text>
+    <text id="common_close">Chiudi</text>
+    <text id="common_start">Avvia</text>
+    <text id="common_stop">Stop</text>
+    <text id="common_retry">Riprova</text>
+    <text id="common_clear">Cancella</text>
+    <text id="common_name">Nome</text>
+    <text id="common_save">Salva</text>
+    <text id="common_cancel">Annulla</text>
+
+    <!-- Tema -->
+    <text id="theme_dark">🌙 Scuro</text>
+    <text id="theme_light">☀️ Chiaro</text>
+    <text id="theme_system">📱 Sistema</text>
+
+    <!-- Home / HUD -->
+    <text id="hud_saved_card">HUD Memorizzato</text>
+    <text id="hud_connection_title">Connessione HUD</text>
+    <text id="hud_status">Stato link: </text>
+    <text id="hud_ip">Indirizzo IP: </text>
+    <text id="hud_scan_qr">Scansiona QR</text>
+    <text id="hud_no_saved">Nessun HUD salvato. Scansiona il QR Code visualizzato sul display della moto.</text>
+    <text id="hud_battery_warning">Ottimizzazione batteria attiva</text>
+    <text id="hud_battery_desc">L'app potrebbe essere fermata in background durante la guida. Disattiva l'ottimizzazione per Motobit Ride.</text>
+    <text id="hud_disable">Disattiva</text>
+
+    <!-- Scansione QR -->
+    <text id="qr_scan_title">Scansiona QR</text>
+    <text id="qr_scan_instruction">Inquadra il QR sul TFT della moto che vuoi collegare.</text>
+    <text id="qr_scan_permission">Serve il permesso fotocamera per scansionare il QR.</text>
+
+    <!-- Garage -->
+    <text id="garage_title">Garage</text>
+    <text id="garage_sub">Dati del veicolo, scadenze e connessione al TFT</text>
+    <text id="garage_vehicle_card">Veicolo</text>
+    <text id="garage_name_label">Nome moto</text>
+    <text id="garage_name_hint">Lascia vuoto per usare il nome dell'HUD</text>
+    <text id="garage_plate_label">Targa</text>
+    <text id="garage_deadline_revision">Revisione tecnica</text>
+    <text id="garage_deadline_tax">Tassa di circolazione</text>
+    <text id="garage_deadline_insurance">Assicurazione</text>
+    <text id="garage_month_label">Mese</text>
+    <text id="garage_day_label">Giorno</text>
+    <text id="garage_day_whole_month">Tutto il mese</text>
+    <text id="garage_deadline_info_title">Come funziona il giorno</text>
+    <text id="garage_deadline_info_text">Il giorno e' libero: chi ha la scadenza "entro il mese" lascia 0 (vale l'ultimo giorno del mese), chi ha una data precisa inserisce il giorno esatto (1-31).</text>
+    <text id="garage_info_card">Informazioni</text>
+    <text id="garage_notifications_card">Avvisi di scadenza</text>
+    <text id="garage_notifications_switch">Inviami notifiche</text>
+    <text id="garage_notifications_desc">Promemoria per revisione, tassa e assicurazione.</text>
+    <text id="garage_days_before_label">Avvisami %d giorni prima</text>
+    <text id="garage_forget">Dimentica</text>
+    <text id="garage_forget_confirm_title">Dimenticare il veicolo?</text>
+    <text id="garage_forget_confirm_text">Verranno cancellati i dati di connessione, il nome, la targa e le scadenze. L'operazione non e' reversibile.</text>
+    <text id="garage_scan_qr">Scansiona QR</text>
+    <text id="garage_rearm">Riattiva avviso</text>
+    <text id="garage_countdown_today">oggi</text>
+    <text id="garage_countdown_days">tra %d giorni</text>
+    <text id="garage_countdown_months">tra %d mesi</text>
+    <text id="garage_countdown_none">non impostata</text>
+    <text id="garage_edit_title">Nome e targa</text>
+    <text id="garage_deadlines_button">Scadenze</text>
+    <text id="garage_deadlines_none">Nessuna scadenza impostata</text>
+    <text id="garage_info_button">Info tecniche</text>
+    <text id="garage_info_sub">HUD, SSID, MAC, risoluzione</text>
+    <text id="garage_info_hud">HUD</text>
+    <text id="garage_info_model">Modello</text>
+    <text id="garage_info_resolution">Risoluzione</text>
+    <text id="garage_info_protocol">Protocollo</text>
+
+</texts>

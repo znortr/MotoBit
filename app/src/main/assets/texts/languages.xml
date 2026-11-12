@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    ELENCO DELLE LINGUE DISPONIBILI.
+
+    Per AGGIUNGERE una lingua:
+      1) aggiungi una riga <language .../> qui sotto
+      2) crea la cartella  assets/texts/<file>/  con i file ui.xml, settings.xml, hud.xml
+
+    Non serve toccare il codice Kotlin.
+-->
+<languages default="it-IT">
+    <language id="it-IT" name="Italiano" flag="🇮🇹" file="it-IT" />
+    <language id="en-GB" name="English" flag="🇬🇧" file="en-GB" />
+</languages>

@@ -501,7 +501,35 @@ object AppTexts {
         "common_cancel" to "Cancel",
     )
 
+    /**
+     * Contesto per leggere i testi dagli XML in `assets/texts/`.
+     * Va impostato una volta in `MainActivity.onCreate` con [init].
+     */
+    private var appContext: android.content.Context? = null
+
+    fun init(context: android.content.Context) {
+        appContext = context.applicationContext
+    }
+
+    /**
+     * Ponte di migrazione.
+     *
+     * 1. cerca la chiave negli **XML** della lingua (`assets/texts/<lingua>/ui|settings|hud.xml`)
+     * 2. se non c'è, ripiega sulle mappe Kotlin qui sotto
+     *
+     * Così si possono spostare i testi negli XML **una pagina per volta** senza
+     * mai rompere l'interfaccia. Quando gli XML saranno completi, le due mappe
+     * e questo ripiego si potranno eliminare.
+     */
     fun get(key: String, language: AppLanguage): String {
+        val ctx = appContext
+        if (ctx != null) {
+            val fromXml = runCatching {
+                LanguageTexts.get(ctx, language.code, key)
+            }.getOrNull()
+            // LanguageTexts restituisce "[chiave]" quando non la trova
+            if (fromXml != null && !fromXml.startsWith("[")) return fromXml
+        }
         val map = if (language == AppLanguage.ENGLISH) enMap else itMap
         return map[key] ?: itMap[key] ?: "[$key]"
     }

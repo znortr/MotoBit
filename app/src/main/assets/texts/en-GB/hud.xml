@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Connection and streaming — language: English (en-GB) -->
+<texts>
+
+    <text id="hud_connect_register">Register your bike</text>
+    <text id="hud_connect_register_sub">Tap to scan the TFT QR code</text>
+    <text id="hud_connect_tap">Tap to connect</text>
+    <text id="hud_connect_connecting">connecting…</text>
+    <text id="hud_connect_waiting">Waiting for the TFT…</text>
+    <text id="hud_connect_connected">connected</text>
+    <text id="hud_connect_failed">Connection failed</text>
+    <text id="hud_connect_cancelled">Connection cancelled</text>
+    <text id="hud_tap_to_cancel">tap to cancel</text>
+    <text id="hud_tap_to_cancel_manual">tap to cancel and switch to manual</text>
+
+    <text id="hud_mirroring_start">Resume</text>
+    <text id="hud_mirroring_stop">Pause</text>
+
+    <text id="link_cause_p2p_off">Wi-Fi Direct is off: enable it in system settings.</text>
+    <text id="link_cause_busy">The HUD may be connected to another phone.</text>
+    <text id="link_cause_no_peer">TFT not found: check that it is on and nearby.</text>
+    <text id="link_cause_passive">Passively waiting for the TFT (resumes by itself when powered on).</text>
+
+</texts>

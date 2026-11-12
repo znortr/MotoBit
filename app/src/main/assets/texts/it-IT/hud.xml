@@ -1,0 +1,27 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Connessione e streaming — lingua: Italiano (it-IT) -->
+<texts>
+
+    <!-- Pulsante grande di connessione (Home) -->
+    <text id="hud_connect_register">Registra la moto</text>
+    <text id="hud_connect_register_sub">Tocca per scansionare il QR del TFT</text>
+    <text id="hud_connect_tap">Tocca per connettere</text>
+    <text id="hud_connect_connecting">si sta connettendo…</text>
+    <text id="hud_connect_waiting">In attesa del TFT…</text>
+    <text id="hud_connect_connected">connessa</text>
+    <text id="hud_connect_failed">Connessione non riuscita</text>
+    <text id="hud_connect_cancelled">Connessione annullata</text>
+    <text id="hud_tap_to_cancel">tocca per annullare</text>
+    <text id="hud_tap_to_cancel_manual">tocca per annullare e passare a manuale</text>
+
+    <!-- Streaming -->
+    <text id="hud_mirroring_start">Riprendi</text>
+    <text id="hud_mirroring_stop">Pausa</text>
+
+    <!-- Cause del link -->
+    <text id="link_cause_p2p_off">Wi-Fi Direct disattivato: attivalo nelle impostazioni di sistema.</text>
+    <text id="link_cause_busy">L'HUD potrebbe essere connesso a un altro telefono.</text>
+    <text id="link_cause_no_peer">TFT non trovato: controlla che sia acceso e vicino.</text>
+    <text id="link_cause_passive">In attesa passiva del TFT (riprende da solo alla riaccensione).</text>
+
+</texts>

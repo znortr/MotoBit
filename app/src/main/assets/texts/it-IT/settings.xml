@@ -1,0 +1,173 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Impostazioni — lingua: Italiano (it-IT) -->
+<texts>
+
+    <!-- Menu -->
+    <text id="settings_title">Impostazioni</text>
+    <text id="settings_menu_title">Impostazioni</text>
+    <text id="settings_menu_sub">Configura l'app, la connessione e i permessi</text>
+    <text id="settings_cat_general_title">Generale</text>
+    <text id="settings_cat_general_sub">Lingua e tema dell'applicazione</text>
+    <text id="settings_cat_connections_title">Connessioni</text>
+    <text id="settings_cat_connections_sub">Modalita' di connessione e riconnessione</text>
+    <text id="settings_cat_resolution_title">Risoluzione</text>
+    <text id="settings_cat_resolution_sub">Dimensioni dello schermo inviato al TFT</text>
+    <text id="settings_cat_permissions_title">Permessi</text>
+    <text id="settings_cat_permissions_sub">Concessione dei permessi necessari</text>
+    <text id="settings_cat_development_title">Opzioni Sviluppo</text>
+    <text id="settings_cat_development_sub">Diagnostica e settaggi sperimentali</text>
+
+    <!-- Generale -->
+    <text id="settings_language_title">Lingua App</text>
+    <text id="settings_language_desc">Seleziona la lingua dell'interfaccia.</text>
+    <text id="settings_theme_title">Tema Grafico</text>
+    <text id="settings_theme_desc">Seleziona l'aspetto dell'applicazione.</text>
+
+    <!-- Connessioni -->
+    <text id="settings_vibrate_toast">Vibrazione attivata</text>
+    <text id="settings_startup_title">Comportamento all'avvio</text>
+    <text id="settings_startup_manual">Solo credenziali salvate</text>
+    <text id="settings_startup_manual_desc">Mostra il nome dell'HUD salvato. Link e video partono solo premendo Avvia.</text>
+    <text id="settings_startup_autolink">Collega l'HUD</text>
+    <text id="settings_startup_autolink_desc">Ricostruisce il Wi-Fi Direct in automatico e mostra il nome. Il video parte solo premendo Avvia.</text>
+    <text id="settings_startup_autolink_stream">Collega e trasmetti</text>
+    <text id="settings_startup_autolink_stream_desc">Ricostruisce il link e avvia anche il video. Android chiede comunque il consenso alla cattura schermo.</text>
+    <text id="settings_encoder_idle_title">Attesa attiva della riconnessione</text>
+    <text id="settings_encoder_idle_desc">Per quanti minuti l'app tenta attivamente di riconnettersi al TFT. Oltre la soglia passa in ascolto passivo: nessun tentativo, ma la riconnessione resta automatica appena il TFT torna.</text>
+    <text id="settings_active_wait_label">Attesa attiva: %d min</text>
+    <text id="settings_home_diag_title">Card diagnostica in Home</text>
+    <text id="settings_home_diag_desc">Mostra in cima alla Home HUD, stato, IP ed evento del link. Default: nascosta.</text>
+    <text id="settings_auto_connect_title">Connessione automatica</text>
+    <text id="settings_auto_connect_desc">All'avvio l'app resta in attesa e si connette da sola appena trova il TFT. Se disattivata, la connessione parte dal pulsante in Home.</text>
+    <text id="settings_vibrate_title">Vibrazione su connessione</text>
+    <text id="settings_vibrate_desc">Breve vibrazione quando il link con il TFT si connette o si perde. Utile con il telefono in tasca.</text>
+    <text id="settings_clock_sync_title">Sincronizzazione orologio TFT</text>
+    <text id="settings_clock_sync_desc">Imposta i pacchetti di sincronizzazione orologio del TFT per correggere problemi con l'ora. Default 3 pacchetti: aumenta se il tuo TFT azzera l'ora.</text>
+    <text id="settings_clock_sync_label">Pacchetti di sincronizzazione: %d</text>
+    <text id="settings_diagnostics_entry">Log e diagnostica</text>
+    <text id="settings_diagnostics_entry_desc">Visualizza eventi in tempo reale e configura il salvataggio log su file.</text>
+
+    <!-- Permessi -->
+    <text id="perm_section_title">Permessi e affidabilita'</text>
+    <text id="perm_section_desc">Servono per far funzionare il link Wi-Fi Direct e la riconnessione automatica anche con l'app in background.</text>
+    <text id="perm_all_ok">Tutto a posto: la riconnessione automatica funziona anche in background.</text>
+    <text id="perm_location_title">Posizione precisa</text>
+    <text id="perm_location_desc">Obbligatoria: Android la richiede per le API Wi-Fi Direct.</text>
+    <text id="perm_gps_title">Posizione di sistema (GPS)</text>
+    <text id="perm_gps_desc">Deve essere ACCESA: con la posizione spenta Android rifiuta la ricerca del TFT.</text>
+    <text id="perm_notif_title">Notifiche</text>
+    <text id="perm_notif_desc">Servono per la notifica del servizio di mirroring.</text>
+    <text id="perm_battery_title">Risparmio energetico</text>
+    <text id="perm_battery_desc">Escludi l'app per non far congelare la riconnessione.</text>
+    <text id="perm_overlay_title">Visualizza sopra altre app</text>
+    <text id="perm_overlay_desc">Serve al pulsante AVVIA che compare sopra l'app quando il TFT non e' connesso.</text>
+    <text id="perm_ok">OK</text>
+    <text id="perm_missing">Da concedere</text>
+    <text id="perm_grant">Concedi</text>
+    <text id="perm_open_settings">Apri impostazioni</text>
+    <text id="perm_enable">Attiva</text>
+    <text id="perm_disable">Disattiva</text>
+
+    <!-- Shizuku -->
+    <text id="shizuku_section_title">Shizuku</text>
+    <text id="shizuku_switch_title">Usa Shizuku</text>
+    <text id="shizuku_switch_desc">Interruttore generale: se OFF l'app non usa Shizuku.</text>
+    <text id="shizuku_status_not_installed">Shizuku non installato</text>
+    <text id="shizuku_status_not_running">Shizuku non avviato</text>
+    <text id="shizuku_status_not_authorized">Shizuku non autorizzato</text>
+    <text id="shizuku_status_ready">Shizuku pronto</text>
+    <text id="shizuku_status_disabled">Shizuku disattivato</text>
+    <text id="shizuku_action_install">Installa</text>
+    <text id="shizuku_action_open">Avvia Shizuku</text>
+    <text id="shizuku_action_grant">Autorizza</text>
+    <text id="shizuku_home_hint">Shizuku non attivo: tocca per attivarlo</text>
+    <text id="shizuku_home_install">Installa Shizuku</text>
+    <text id="shizuku_home_activate">Attiva Shizuku</text>
+
+    <!-- Preparazione e Risoluzione -->
+    <text id="setup_title">Prepara MotoBit (una volta sola)</text>
+    <text id="setup_needed">Serve per cambiare e ripristinare la misura dello schermo.</text>
+    <text id="setup_ready">Pronto: non serve piu' Shizuku.</text>
+    <text id="setup_working">Preparazione in corso…</text>
+    <text id="setup_need_shizuku">Prima attiva Shizuku</text>
+    <text id="setup_action">Prepara ora</text>
+    <text id="res_not_ready">Prima prepara MotoBit: serve una volta sola.</text>
+    <text id="res_scale_title">Percentuale del formato TFT</text>
+    <text id="res_preview">Verrà applicato</text>
+    <text id="res_active">Attivo (via %s)</text>
+    <text id="res_density">Adatta anche la densità</text>
+    <text id="res_rotation">Rotazione</text>
+    <text id="res_rot_auto">Auto</text>
+    <text id="res_rot_portrait">Verticale</text>
+    <text id="res_rot_landscape">Orizzontale</text>
+    <text id="res_navbar">Nascondi barra comandi</text>
+    <text id="res_dim">Oscura schermo</text>
+    <text id="res_dim_desc">Abbassa la luminosità: lo schermo resta acceso</text>
+    <text id="res_master_title">Risoluzione del telefono</text>
+    <text id="res_master_desc">Se accesa, il display viene oscurato e portato al formato del cruscotto</text>
+    <text id="res_unsafe">Configurazione non sicura: non ho toccato niente</text>
+    <text id="res_crop_title">Taglia il bordo inferiore</text>
+    <text id="res_crop_desc">Toglie la barra dei comandi dal video: sul TFT quello spazio andrebbe perso comunque. Opzionale, spegnibile.</text>
+    <text id="res_percent">Percentuale del formato TFT</text>
+    <text id="res_orient">Orientamento</text>
+    <text id="res_apply">Applica</text>
+    <text id="res_restore">Ripristina tutto</text>
+    <text id="res_apply_locked">Applicazione bloccata finche' non sono attivi i comandi di ripristino (tasti volume e tasto accensione). Serve a non rendere piu' inutilizzabile il telefono.</text>
+    <text id="res_apply_hint">La risoluzione si applica con la bolla, o coprendo il sensore in modalità tasca.</text>
+
+    <!-- Modalità display -->
+    <text id="mode_title">Modalità</text>
+    <text id="mode_manual">Volume +</text>
+    <text id="mode_pocket">Telefono in tasca</text>
+    <text id="mode_always_on">Telefono sul manubrio</text>
+    <text id="mode_short_pocket">In Tasca</text>
+    <text id="mode_short_handlebar">Sul Manubrio</text>
+    <text id="mode_pocket_unsupported">Questo telefono non sa spegnere lo schermo col sensore (modalità non disponibile)</text>
+    <text id="bubble_dim">La bolla oscura (-50%)</text>
+    <text id="pocket_delay">Ritardo del sensore (solo coprendo)</text>
+
+    <!-- Guida -->
+    <text id="guide_link">Guida passo passo</text>
+    <text id="guide_title">Come preparare MotoBit</text>
+    <text id="guide_intro">MotoBit ha bisogno di un piccolo aiuto per cambiare la misura dello schermo. Si fa una volta sola: dopo non serve piu'.</text>
+    <text id="guide_note_reboot">Tieni Shizuku installato: dopo la preparazione non serve piu', ma e' la riserva se un giorno i permessi si perdessero.</text>
+    <text id="guide_step1_title">Installa Shizuku</text>
+    <text id="guide_step1_desc">Apri il Play Store, scrivi Shizuku nella ricerca e tocca Installa. Quando ha finito, torna qui.</text>
+    <text id="guide_step2_title">Attiva le opzioni sviluppatore</text>
+    <text id="guide_step2_desc">Apri Impostazioni, tocca Info telefono e poi tocca sette volte Numero build. Compare la scritta Ora sei uno sviluppatore. Se non compare, tocca ancora.</text>
+    <text id="guide_step3_title">Accendi il debug wireless</text>
+    <text id="guide_step3_desc">Torna indietro, apri Sistema e poi Opzioni sviluppatore, e accendi Debug wireless. Lascia il Wi-Fi accesso.</text>
+    <text id="guide_step4_title">Accoppia Shizuku</text>
+    <text id="guide_step4_desc">Apri Shizuku e tocca Avvia. Scegli Accoppia con il codice: arriva una notifica con sei numeri. Scrivi quei numeri in Shizuku e tocca Accoppia.</text>
+    <text id="guide_step5_title">Avvia Shizuku</text>
+    <text id="guide_step5_desc">Tocca di nuovo Avvia. Su Shizuku deve comparire In esecuzione.</text>
+    <text id="guide_step6_title">Autorizza MotoBit</text>
+    <text id="guide_step6_desc">Apri MotoBit, vai in Impostazioni, poi Permessi, tocca Shizuku e poi Autorizza. Scegli Consenti.</text>
+    <text id="guide_step7_title">Prepara MotoBit</text>
+    <text id="guide_step7_desc">Sempre in Permessi, tocca Prepara ora e aspetta la scritta Pronto. Da qui in poi Shizuku non serve piu'.</text>
+    <text id="guide_res_title">Come si usa la risoluzione</text>
+    <text id="guide_res_1">Apri Impostazioni e poi Risoluzione.</text>
+    <text id="guide_res_2">Scegli la percentuale: piu' alta vuol dire testo piu' fine sul cruscotto.</text>
+    <text id="guide_res_3">Tocca la bolla o copri il sensore per applicare.</text>
+    <text id="guide_res_4">Se qualcosa non va, spegni e riaccendi lo schermo con il tasto accensione: torna tutto come prima.</text>
+    <text id="guide_trouble_title">Se qualcosa non va</text>
+    <text id="guide_trouble_1">Shizuku non si avvia: rifai il passo 4 (accoppia con il codice), poi il passo 5.</text>
+    <text id="guide_trouble_2">In Permessi leggi Prima attiva Shizuku: apri Shizuku, tocca Avvia e torna qui.</text>
+    <text id="guide_trouble_3">La risoluzione non si applica: apri Shizuku, tocca Avvia, poi in Permessi tocca Prepara ora.</text>
+    <text id="guide_trouble_4">Hai cambiato telefono o cancellato i dati di MotoBit: rifai tutto dall'inizio.</text>
+
+    <text id="resolution_next_phase_title">Impostazioni risoluzione</text>
+    <text id="resolution_next_phase_desc">Percentuale, oscuramento, rotazione e barra comandi saranno disponibili nella prossima fase.</text>
+
+    <!-- Opzioni sviluppo -->
+    <text id="diag_title">Diagnostica</text>
+    <text id="diag_section_title">Log diagnostica</text>
+    <text id="diag_switch_title">Attiva log</text>
+    <text id="diag_switch_desc">Scrive il log completo (canali, sessione, protocollo) nella cartella Documenti dell'app.</text>
+    <text id="diag_footer">Con l'interruttore attivo il log completo viene scritto anche su file in Documenti; con l'interruttore spento la scrittura su file e' disattivata.</text>
+    <text id="diag_clear_button">Pulisci</text>
+    <text id="diag_toast_cleared">Log pulito</text>
+    <text id="diag_keepalive_title">Keepalive orologio periodico PXC (5 min)</text>
+    <text id="diag_keepalive_desc">Push dell'ora NON richiesto dal TFT sulla socket di controllo. Misurato che il TFT non lo legge: resta in coda e blocca gli ACK, facendogli chiudere la sessione. Lasciare OFF.</text>
+
+</texts>

@@ -31,6 +31,9 @@ class MainActivity : ComponentActivity() {
 
         // Impostazioni, HUD memorizzato e profilo veicolo vanno caricati prima della UI
         AppSettings.init(applicationContext)
+
+        // Testi: contesto per leggerli dagli XML in assets/texts/ (una lingua = una cartella)
+        com.nos.motobitride.ui.i18n.AppTexts.init(applicationContext)
         SavedHud.init(applicationContext)
         VehicleStore.init(applicationContext)
         SavedApps.init(applicationContext)
