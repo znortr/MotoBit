@@ -377,7 +377,7 @@ fun HudScreen(
                     onClick = {
                         when {
                             // Nessuna moto: apre la scansione
-                            savedHud == null -> onShowQrScanner
+                            savedHud == null -> onShowQrScanner()
 
                             // In corso o in attesa: ANNULLA con feedback
                             working || autoWaiting -> {
