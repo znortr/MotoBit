@@ -68,8 +68,8 @@ object AppTexts {
         "hud_connect_cancelled" to "Connessione annullata",
         "hud_tap_to_cancel" to "tocca per annullare",
         "hud_tap_to_cancel_manual" to "tocca per annullare e passare a manuale",
-        "hud_mirroring_start" to "Avvia mirroring",
-        "hud_mirroring_stop" to "Ferma mirroring",
+        "hud_mirroring_start" to "Riprendi",
+        "hud_mirroring_stop" to "Pausa",
 
         "settings_home_diag_title" to "Card diagnostica in Home",
         "settings_home_diag_desc" to "Mostra in cima alla Home HUD, stato, IP ed evento del link. Default: nascosta.",

@@ -274,7 +274,6 @@ object AppSettings {
         _displayMode.value = DisplayMode.fromStored(p.getString(KEY_DISPLAY_MODE, null))
         _displayOrigDp.value = p.getInt(KEY_DISPLAY_ORIG_DP, 0)
         _displayBubbleDim.value = p.getBoolean(KEY_DISPLAY_BUBBLE_DIM, true)
-        _displayCropPx.value = p.getInt(KEY_DISPLAY_CROP_PX, 0)
         _displayPocketDelaySec.value = p.getInt(KEY_POCKET_DELAY_SEC, 1).coerceIn(0, 5)
         // La modalità "auto" non esiste più: solo verticale o orizzontale.
         if (_displayRotation.value == "auto") _displayRotation.value = "portrait"
