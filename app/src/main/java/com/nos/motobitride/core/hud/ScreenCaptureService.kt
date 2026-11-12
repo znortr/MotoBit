@@ -241,7 +241,14 @@ class ScreenCaptureService : Service() {
 
             return NotificationCompat.Builder(context, CHANNEL_ID)
                 .setContentTitle("MotoBit")
-                .setContentText(text)
+                // ⚠️ NIENTE CIFRE nel testo della notifica.
+            //
+            // Android 16 (SensitiveContentProtectionManagerService) classifica
+            // "sensibile" un'app le cui notifiche contengono cifre (qui c'era
+            // "Mirroring 680x864") e, durante la proiezione, ne ANNERISCE
+            // TUTTE LE FINESTRE: era questa la causa della bolla AVVIA nera
+            // nel TFT. Il numero resta nel log, dove serve a noi.
+            .setContentText(text.replace(Regex("""\s*\d+\s*[x×]\s*\d+"""), "").trim())
                 .setSmallIcon(R.mipmap.ic_launcher)
                 .setPriority(NotificationCompat.PRIORITY_LOW)
                 .setOnlyAlertOnce(true)

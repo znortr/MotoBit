@@ -398,6 +398,15 @@ object HudSession {
         }
     }
 
+    /**
+     * Ultima app aperta per il mirroring.
+     *
+     * Serve a «Stop» della notifica per chiudere l'app rimasta in primo piano
+     * e riportare MotoBit davanti: va letta PRIMA di `stopStream()`, che azzera
+     * l'avvio differito.
+     */
+    val lastLaunchedPackage: String? get() = pendingLaunchPackage
+
     /** Annulla l'avvio differito (annullamento da parte dell'utente). */
     fun cancelPendingLaunch() {
         pendingLaunchJob?.cancel()

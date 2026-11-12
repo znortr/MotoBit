@@ -91,6 +91,15 @@ class StartBubbleService : Service() {
     private var bubbleSpinner: ProgressBar? = null
     private var working = false
 
+    /**
+     * Vero solo DOPO il tocco sulla bolla.
+     *
+     * Caso 3 della specifica: prima del tocco la bolla deve stare ferma su
+     * "AVVIA" qualunque sia lo stato interno (la ricerca può essere già stata
+     * avviata dal tocco sull'app). Dopo il tocco segue lo stato vero.
+     */
+    private var tapped = false
+
     override fun onBind(intent: Intent?): IBinder? = null
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -290,6 +299,7 @@ class StartBubbleService : Service() {
 
     private fun onBubbleTap() {
         AppLog.i(TAG, "Bolla AVVIA premuta")
+        tapped = true
         setWorking(true)
         runCatching {
             startActivity(
@@ -315,8 +325,26 @@ class StartBubbleService : Service() {
                         stopSelf()
                         return@launch
                     }
-                    StreamState.IDLE, StreamState.ERROR, null -> setWorking(false)
-                    else -> setWorking(true)
+                    // ⚠️ Non basta guardare `stream`: durante la RICERCA di
+                // connessione (TFT spento) `stream` e' ancora `null`, e la
+                // bolla restava ferma su "AVVIA" mentre il telefono stava gia'
+                // cercando il TFT. La ricerca attiva si legge da
+                // `autoConnectForSession`.
+                // CASO 3 (CONNESSIONE.md): tocco sull'app -> bolla con la
+                // scritta AVVIA; tocco su AVVIA -> parte la ricerca e SOLO
+                // ALLORA lo spinner; streaming -> la bolla sparisce.
+                // Lo spinner lo decide il TOCCO, non lo stato: prima del tocco
+                // la bolla deve restare ferma su AVVIA anche se una ricerca e'
+                // gia' attiva (per esempio avviata dal tocco sull'app).
+                // Si torna alla scritta solo se un tentativo termina davvero
+                // (IDLE/ERROR), cosi' si puo' ritentare.
+                // Prima del tocco la bolla sta ferma su "AVVIA": lo stato
+                // interno non la fa girare. Dopo il tocco segue lo stato vero
+                // e torna ad "AVVIA" solo quando la ricerca è davvero finita.
+                StreamState.IDLE, StreamState.ERROR ->
+                    if (tapped) setWorking(HudSession.autoConnectForSession.value) else Unit
+                else ->
+                    if (tapped) setWorking(true) else Unit
                 }
                 delay(600)
             }

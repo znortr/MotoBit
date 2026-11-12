@@ -150,7 +150,38 @@ private fun StreamLaunchScreen(
         } else {
             AppLog.w("StreamLaunch", "Consenso negato: mirroring non avviato")
             cancelled = true
+            // RIFIUTO: non c'è più nulla in corso.
+            // Va spenta la ricerca di sessione, altrimenti la Home la rilancia
+            // da sola (`LaunchedEffect` su sessionAuto/IDLE) e la bolla AVVIA
+            // resta a girare per sempre.
+            HudSession.cancelPendingLaunch()
+            HudSession.clearAutoConnectForSession()
+            // La bolla NON si chiude: torna ad "AVVIA" (lo fa il sorvegliante
+            // quando vede IDLE + nessuna ricerca) e aspetta un nuovo tap.
             onFinish()
+        }
+    }
+
+    /**
+     * Riporta MotoBit in primo piano.
+     *
+     * È un parametro di una funzione composable: `ctx.getActivity()` dà
+     * l'Activity corrente, e l'avvio è consentito perché parte da un tocco
+     * dell'utente sul nostro dialogo.
+     */
+    fun requestBringMotobitFront() {
+        runCatching {
+            ctx.startActivity(
+                android.content.Intent(ctx, com.nos.motobitride.MainActivity::class.java)
+                    .addFlags(
+                        android.content.Intent.FLAG_ACTIVITY_NEW_TASK or
+                                android.content.Intent.FLAG_ACTIVITY_CLEAR_TOP or
+                                android.content.Intent.FLAG_ACTIVITY_SINGLE_TOP
+                    )
+            )
+            AppLog.i("StreamLaunch", "MotoBit riportato in primo piano")
+        }.onFailure {
+            AppLog.w("StreamLaunch", "riapertura MotoBit non riuscita: ${it.message}")
         }
     }
 
@@ -186,13 +217,18 @@ private fun StreamLaunchScreen(
 
         requestConsentIfNeeded()
 
-        // NON si chiama connect() qui.
+        // NON si chiama `connect()` direttamente.
         //
-        // La connessione e' gia' in corso (auto di sessione avviata dal tocco
-        // sull'app). `HudSession.connect()` con il link non ancora attivo
-        // esegue `teardownP2p()` e RIparte da zero: premere AVVIA a meta'
-        // connessione la azzerava (era questa la causa di "9 volte su 10 non si
-        // connette").
+        // `HudSession.connect()` con il link non ancora attivo esegue
+        // `teardownP2p()` e RIparte da zero: premere AVVIA a meta' connessione
+        // la azzerava (era questa la causa di "9 volte su 10 non si connette").
+        //
+        // Si usa invece la via **idempotente**: `requestAutoConnect()` non fa
+        // nulla se una ricerca e' gia' in corso, e la AVVIA se non c'e'.
+        // Cosi' il tocco sulla bolla garantisce sempre una RICERCA ATTIVA
+        // (anche a TFT spento, per tutta la durata di "attesa attiva"),
+        // senza mai azzerare un tentativo gia' avviato.
+        HudSession.requestAutoConnect()
     }
 
     // Quando lo streaming parte, questa schermata ha finito il suo lavoro.
@@ -213,7 +249,26 @@ private fun StreamLaunchScreen(
             message = "Consenso e connessione al TFT in corso…",
             onCancel = {
                 cancelled = true
+                // Il pacchetto va letto PRIMA: cancelPendingLaunch() lo azzera.
+                val pkg = HudSession.lastLaunchedPackage
                 HudSession.cancelPendingLaunch()
+                // ANNULLATO DALL'UTENTE: non c'è più nulla in corso, quindi la
+                // ricerca di sessione va spenta e la bolla AVVIA non deve
+                // continuare a girare.
+                HudSession.clearAutoConnectForSession()
+                StartBubbleService.hide(ctx)
+
+                // Come per «Stop» della notifica: l'app aperta per il
+                // mirroring va chiusa e MotoBit deve tornare davanti.
+                if (!pkg.isNullOrBlank() && pkg != ctx.packageName) {
+                    runCatching {
+                        val am = ctx.getSystemService(android.content.Context.ACTIVITY_SERVICE)
+                                as android.app.ActivityManager
+                        am.killBackgroundProcesses(pkg)
+                    }
+                }
+                requestBringMotobitFront()
+
                 // Se il consenso era già stato concesso il servizio tiene la
                 // proiezione: va fermato, altrimenti l'indicatore di
                 // condivisione resta acceso senza trasmettere nulla.

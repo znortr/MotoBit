@@ -169,6 +169,21 @@ class MainActivity : ComponentActivity() {
                 // sempre. Qui si rimette il valore originale (se memorizzato).
                 runCatching { com.nos.motobitride.core.display.DimOverlay.hide(applicationContext) }
 
+                // Igiene della bolla AVVIA: se non c'e' ne' una sessione ne' una
+                // ricerca di connessione in corso, una bolla rimasta viva dalla
+                // sessione precedente non ha senso e va chiusa (era quella che
+                // "girava" da sola all'apertura dell'app).
+                runCatching {
+                    val nessunaSessione = com.nos.motobitride.core.hud.HudSession.stream == null
+                    val nessunaRicerca =
+                        !com.nos.motobitride.core.hud.HudSession.autoConnectForSession.value
+                    if (nessunaSessione && nessunaRicerca) {
+                        com.nos.motobitride.feature.stream.StartBubbleService
+                            .hide(applicationContext)
+                        AppLog.i("MainActivity", "Bolla AVVIA residua chiusa (nulla in corso)")
+                    }
+                }
+
                 if (AppSettings.displayOverride.value) {
                     AppLog.w("MainActivity", "Display ancora modificato dall'avvio precedente: ripristino")
                     val result = DisplayMaster.restoreAll(applicationContext)

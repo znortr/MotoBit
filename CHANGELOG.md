@@ -4,6 +4,44 @@ Formato: voci dalla più recente alla più vecchia. Backup: non obbligatorio a o
 
 ---
 
+## 🔧 2.7.0 — Bolla AVVIA, annullamenti, notifiche nere, barra comandi
+
+**Data**: 2026-11-12 · **versionCode**: 2700
+
+### Bolla AVVIA (specifica in `CONNESSIONE.md`)
+- Compare solo quando la connessione al TFT è **in corso** (caso 3); casi 1 e 2 senza bolla
+- Prima del tocco mostra **«AVVIA» ferma**: lo spinner lo decide **solo il tocco**, non lo stato interno
+- Tocco → spinner + ricerca attiva per tutta la durata di «attesa attiva della riconnessione»
+- Streaming attivo → **la bolla sparisce**
+- Bolla **residua** di una sessione precedente: chiusa all'avvio dell'app
+
+### Annullamenti (dialogo e notifica ora identici)
+- Consenso **rifiutato** → spinner fermo, torna «AVVIA», nessun rilancio automatico della Home
+- **«Annulla» nel dialogo** → ricerca spenta + bolla chiusa + app chiusa (kill background) + **MotoBit in primo piano**
+- **«Stop» nella notifica** → stessa sequenza
+- Guardia: il pacchetto di MotoBit stesso non viene mai "killato"
+
+### Riquadro nero nel TFT (bolla e notifiche)
+- Causa: Android 16 redige la cattura delle app classificate "sensibili" e **annerisce tutte le loro finestre**; l'innesco erano le **cifre** nella notifica (`"Mirroring 680x864"`)
+- Correzione: risoluzione rimossa dal testo della notifica (resta nel log)
+
+### Barra comandi
+- `policy_control = immersive.navigation=*` è **ignorato** da ColorOS (misurato) → resta come tentativo per telefoni compatibili
+- `hide(navigationBars())` per-app + `decorFitsSystemWindows` → nessuna fascia riservata dentro MotoBit
+- Visibile a risoluzione normale, nascosta **solo** con display modificato + switch ON
+- Fix d'ordine: il flag `displayOverride` viene alzato/abbassato **prima** del cambio display (altrimenti la barra non riappariva)
+
+### Altro
+- Bolla **gialla** quando lo schermo è oscurato (blu = solo risoluzione, grigio = normale)
+- Entrambe le bolle restano **dentro** lo schermo dopo il ridimensionamento
+- Rimosso il pulsante «Applica» dalla pagina Risoluzione (si applica con la bolla o col sensore)
+- Pulsanti **In Tasca / Sul Manubrio** in Home (stessa impostazione della pagina Risoluzione)
+- Fix: il tocco su «Registra la moto» non apriva la scansione QR (mancava la chiamata: `onShowQrScanner` → `onShowQrScanner()`)
+- **`CONNESSIONE.md`**: specifica di riferimento della connessione e dell'avvio streaming (3 casi, regole, punti di codice)
+- **TODO**: §15 orientamento TFT orizzontale · §16 taglio del bordo inferiore (provato e rimosso, da ripensare)
+
+---
+
 ## 🖥️ 2.6.0 — Display: motore riscritto, due modalità, oscuramento reale
 
 **Data**: 2026-11-10 · **versionCode**: 2600
