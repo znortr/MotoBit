@@ -24,7 +24,16 @@
 ## Installation
 
 > [!IMPORTANT]
-> **Download & Install:** Grab the latest APK release directly from **[MotoBit Releases](https://github.com/znortr/MotoBit/releases)** and follow the Android installation guide below.
+> **Download & Install:**
+> 
+> Grab the latest APK release directly from **[MotoBit Releases](https://github.com/znortr/MotoBit/releases)** and follow the Android installation guide below.
+
+> [!IMPORTANT]
+> **Shizuku Integration Required for Advanced Features:**
+> 
+> **MotoBit** relies on **[Shizuku](https://shizuku.rikka.app/)** to unlock system-level capabilities without root—specifically **automatic screen resolution adaptation & restoration** for true full-screen TFT mirroring and **optional background app force-closing** to prevent navigation conflicts while riding.
+>
+> After installing **MotoBit**, install and pair **Shizuku** from the Google Play Store using the in-app **SHIZUKU Instructions** guide.
 
 ### How to Install on Android
 
@@ -33,15 +42,15 @@
    > [!NOTE]
    > **Android 14+ Security Prompts:** Android 14 and newer enforce stricter sideloading and permission checks. You may see an extra warning that the app is not from an official store or is still in **Alpha**—review the prompt and confirm only if you intentionally want to install **MotoBit** from the official repository release.
 3. **Install MotoBit:** Return to the installer prompt, tap **Install**, and wait for the setup to finish before opening the app.
+4. **Install & Configure Shizuku:** Download **Shizuku** from the Google Play Store, pair it via **Wireless debugging**, and follow **Settings → Shizuku & Setup → SHIZUKU Instructions** inside **MotoBit** to authorize resolution switching (and optionally enable background app closing).
 
 <details>
 <summary><strong>Troubleshooting Sideloading & First Launch</strong></summary>
 
 * **Option greyed out or blocked on Android 14+:** Check that no work profile, MDM policy, or restricted settings lock is blocking unknown sources, and confirm the APK downloaded completely without corruption.
-* **First-time setup & Shizuku:** After opening **MotoBit**, complete the initial setup and, if you plan to use screen resolution adaptation or optional Shizuku features, follow the in-app **SHIZUKU Instructions**.
+* **Xiaomi / POCO / HyperOS devices:** If **Shizuku** permissions or background app closing fail after pairing, make sure **USB debugging (Security settings)** is enabled in Developer Options and notifications are allowed for **Shizuku**.
 
 </details>
-
 
 ---
 
