@@ -21,7 +21,26 @@
 
 
 ---
+## Installation
 
+> [!IMPORTANT]
+> **Download & Install:** Grab the latest APK release directly from **[MotoBit Releases](https://github.com/znortr/MotoBit/releases)** and follow the Android installation guide below.
+
+### How to Install on Android
+
+1. **Download the APK:** Open **[https://github.com/znortr/MotoBit/releases](https://github.com/znortr/MotoBit/releases)** on your Android device and download the latest `.apk` file from the release assets.
+2. **Allow installation from unknown sources (Android 8+ / Android 14+):** When launching the APK, Android blocks sideloaded apps by default. Tap **Settings** in the prompt and enable **Allow from this source** for your browser or file manager.
+   > [!NOTE]
+   > **Android 14+ Security Prompts:** Android 14 and newer enforce stricter sideloading and permission checks. You may see an extra warning that the app is not from an official store or is still in **Alpha**—review the prompt and confirm only if you intentionally want to install **MotoBit** from the official repository release.
+3. **Install MotoBit:** Return to the installer prompt, tap **Install**, and wait for the setup to finish before opening the app.
+
+<details>
+<summary><strong>Troubleshooting Sideloading & First Launch</strong></summary>
+
+* **Option greyed out or blocked on Android 14+:** Check that no work profile, MDM policy, or restricted settings lock is blocking unknown sources, and confirm the APK downloaded completely without corruption.
+* **First-time setup & Shizuku:** After opening **MotoBit**, complete the initial setup and, if you plan to use screen resolution adaptation or optional Shizuku features, follow the in-app **SHIZUKU Instructions**.
+
+</details>
 
 
 ---
