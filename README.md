@@ -15,3 +15,21 @@
 </div>
 
 ---
+> [!WARNING]
+> **Active Alpha Release — Compatibility Notice**  
+> **MotoBit** is currently in active **Alpha** development. All mirroring, resolution adaptation, and connection stability pipelines have been developed and validated on the **Voge DS800X Rally**. Compatibility and behavior on TFT displays from other motorcycle manufacturers are not guaranteed yet and remain to be tested.
+
+
+---
+
+
+
+---
+
+<div align="center">
+
+<sub>
+<strong>Disclaimer:</strong> <strong>MotoBit</strong> is an independent project crafted by a rider for riders. It is not affiliated with, endorsed by, or officially connected to Voge, Carbit, EasyConnection, or any other brands, trademarks, or protocols referenced in this repository. All product and company names remain the property of their respective owners.
+</sub>
+
+</div>
